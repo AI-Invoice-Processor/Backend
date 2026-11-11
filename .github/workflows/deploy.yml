@@ -33,7 +33,7 @@ jobs:
         run: pytest
 
       - name: Package deployment
-        run: tar --exclude=.git --exclude=.venv --exclude=__pycache__ --exclude=.env --exclude=backend-deploy.tgz -czf backend-deploy.tgz .
+        run: tar --exclude=.git --exclude=.venv --exclude=__pycache__ --exclude=.env -czf "$RUNNER_TEMP/backend-deploy.tgz" .
 
       - name: Configure SSH
         env:
@@ -53,7 +53,7 @@ jobs:
           scp -i "$RUNNER_TEMP/ssh/deploy_key" \
             -o UserKnownHostsFile="$RUNNER_TEMP/ssh/known_hosts" \
             -o StrictHostKeyChecking=yes \
-            backend-deploy.tgz "$DEPLOY_USER@$DEPLOY_HOST:/tmp/backend-deploy.tgz"
+            "$RUNNER_TEMP/backend-deploy.tgz" "$DEPLOY_USER@$DEPLOY_HOST:/tmp/backend-deploy.tgz"
 
       - name: Deploy backend container
         env:
