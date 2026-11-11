@@ -17,7 +17,7 @@ let valid = true;
 if (title) valid = validate("PR title", title) && valid;
 
 const range = baseSha ? `${baseSha}..${headSha}` : headSha;
-const subjects = execFileSync("git", ["log", "--format=%s", range], {
+const subjects = execFileSync("git", ["log", "--no-merges", "--format=%s", range], {
   encoding: "utf8",
 }).trim();
 
