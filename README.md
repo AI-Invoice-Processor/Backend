@@ -28,6 +28,6 @@ docker network create ai-invoice-network 2>/dev/null || true
 docker compose -f docker-compose.prod.yml up --build
 ```
 
-En producción, `POSTGRES_PASSWORD` se genera dentro del servidor y se guarda en `/opt/ai-invoice-processor/.env`, que no se versiona.
+En producción, `POSTGRES_PASSWORD` se genera dentro del servidor y se guarda en `/home/ubuntu/ai-invoice-processor/.env`, que no se versiona.
 
 El workflow `.github/workflows/deploy.yml` ejecuta las pruebas y despliega únicamente el backend en cada push a `main`. Requiere los secretos `DEPLOY_HOST`, `DEPLOY_USER`, `DEPLOY_SSH_KEY` y `DEPLOY_KNOWN_HOSTS`.

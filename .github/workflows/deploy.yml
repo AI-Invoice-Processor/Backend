@@ -64,7 +64,7 @@ jobs:
             -o UserKnownHostsFile="$RUNNER_TEMP/ssh/known_hosts" \
             -o StrictHostKeyChecking=yes "$DEPLOY_USER@$DEPLOY_HOST" 'bash -se' <<'REMOTE'
           set -eu
-          base=/opt/ai-invoice-processor
+          base=/home/ubuntu/ai-invoice-processor
           mkdir -p "$base/backend"
           docker network inspect ai-invoice-network >/dev/null 2>&1 || docker network create ai-invoice-network
           if [ ! -f "$base/.env" ]; then
