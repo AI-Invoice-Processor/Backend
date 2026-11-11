@@ -19,6 +19,21 @@ def test_health_is_public() -> None:
     assert response.json() == {"status": "healthy", "service": "backend"}
 
 
+def test_openapi_and_swagger_docs_are_available() -> None:
+    client = make_client()
+
+    openapi_response = client.get("/api/openapi.json")
+    docs_response = client.get("/api/docs")
+    redoc_response = client.get("/api/redoc")
+
+    assert openapi_response.status_code == 200
+    assert openapi_response.json()["info"]["title"] == "AI Invoice Processor API"
+    assert "/api/invoices" in openapi_response.json()["paths"]
+    assert docs_response.status_code == 200
+    assert "Swagger UI" in docs_response.text
+    assert redoc_response.status_code == 200
+
+
 def test_invoice_list_starts_empty() -> None:
     response = make_client().get("/api/invoices")
 

@@ -13,7 +13,27 @@ ALLOWED_CONTENT_TYPES = {"application/pdf", "image/png", "image/jpeg"}
 
 def create_app(settings: Settings | None = None) -> FastAPI:
     config = settings or get_settings()
-    app = FastAPI(title=config.app_name, version="0.1.0")
+    app = FastAPI(
+        title=config.app_name,
+        description=(
+            "API para recepción y procesamiento de facturas. "
+            "La documentación interactiva está disponible en /api/docs."
+        ),
+        version="0.1.0",
+        docs_url="/api/docs",
+        redoc_url="/api/redoc",
+        openapi_url="/api/openapi.json",
+        openapi_tags=[
+            {
+                "name": "system",
+                "description": "Comprobaciones de estado y disponibilidad del servicio.",
+            },
+            {
+                "name": "invoices",
+                "description": "Operaciones de recepción y consulta de facturas.",
+            },
+        ],
+    )
     app.add_middleware(
         CORSMiddleware,
         allow_origins=config.cors_origins,
@@ -44,11 +64,22 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             },
         )
 
-    @app.get("/health", tags=["system"])
+    @app.get(
+        "/health",
+        tags=["system"],
+        summary="Comprobar estado del servicio",
+        response_description="El servicio está activo.",
+    )
     async def health() -> dict[str, str]:
         return {"status": "healthy", "service": "backend"}
 
-    @app.get("/ready", tags=["system"])
+    @app.get(
+        "/ready",
+        tags=["system"],
+        summary="Comprobar disponibilidad de dependencias",
+        response_description="El servicio y PostgreSQL están disponibles.",
+        responses={503: {"description": "La base de datos no está disponible."}},
+    )
     async def ready() -> dict[str, str]:
         try:
             with psycopg.connect(config.database_url, connect_timeout=3) as connection:
@@ -60,12 +91,27 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             ) from exc
         return {"status": "ready", "service": "backend"}
 
-    @app.get("/api/invoices", tags=["invoices"])
+    @app.get(
+        "/api/invoices",
+        tags=["invoices"],
+        summary="Listar facturas",
+        response_description="Lista de facturas procesadas.",
+    )
     async def list_invoices() -> list[dict[str, str]]:
         """Contrato inicial; la persistencia real se incorporará en la siguiente fase."""
         return []
 
-    @app.post("/api/invoices", status_code=status.HTTP_202_ACCEPTED, tags=["invoices"])
+    @app.post(
+        "/api/invoices",
+        status_code=status.HTTP_202_ACCEPTED,
+        tags=["invoices"],
+        summary="Cargar una factura",
+        response_description="La factura fue aceptada para procesamiento.",
+        responses={
+            400: {"description": "Tipo de archivo no permitido."},
+            413: {"description": "El archivo supera el tamaño máximo permitido."},
+        },
+    )
     async def upload_invoice(
         file: Annotated[UploadFile, File(...)],
     ) -> dict[str, str | int]:

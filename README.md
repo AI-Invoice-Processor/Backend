@@ -19,6 +19,14 @@ Endpoints iniciales:
 - `GET /api/invoices`: contrato inicial, actualmente devuelve una lista vacía.
 - `POST /api/invoices`: valida PDF, PNG y JPG de hasta 10 MB y acepta el archivo para procesamiento futuro.
 
+## Documentación de la API
+
+FastAPI genera automáticamente la documentación interactiva:
+
+- Swagger UI: `GET /api/docs`
+- ReDoc: `GET /api/redoc`
+- Especificación OpenAPI JSON: `GET /api/openapi.json`
+
 ## Docker
 
 El Compose de producción levanta FastAPI y PostgreSQL en la red externa `ai-invoice-network`. Para una prueba local:
