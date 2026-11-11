@@ -1,0 +1,46 @@
+services:
+  backend:
+    build:
+      context: .
+    image: ai-invoice-processor/backend:latest
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: ${DATABASE_URL:-postgresql://invoice:${POSTGRES_PASSWORD:-local-dev-password-change-me}@db:5432/invoices}
+      ALLOWED_ORIGINS: ${ALLOWED_ORIGINS:-http://localhost:5173,http://localhost}
+      ENVIRONMENT: ${ENVIRONMENT:-production}
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - ai-invoice-network
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health')"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+
+  db:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-invoices}
+      POSTGRES_USER: ${POSTGRES_USER:-invoice}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-local-dev-password-change-me}
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    networks:
+      - ai-invoice-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+networks:
+  ai-invoice-network:
+    name: ai-invoice-network
+    external: true
+
+volumes:
+  postgres-data:
+    name: ai-invoice-postgres-data

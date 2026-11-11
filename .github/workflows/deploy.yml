@@ -1,0 +1,84 @@
+name: Deploy Backend
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-backend
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  verify-and-deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: requirements-dev.txt
+
+      - name: Install dependencies
+        run: python -m pip install -r requirements-dev.txt
+
+      - name: Verify backend
+        run: pytest
+
+      - name: Package deployment
+        run: tar --exclude=.git --exclude=.venv --exclude=__pycache__ --exclude=.env -czf backend-deploy.tgz .
+
+      - name: Configure SSH
+        env:
+          DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          DEPLOY_KNOWN_HOSTS: ${{ secrets.DEPLOY_KNOWN_HOSTS }}
+        run: |
+          install -m 700 -d "$RUNNER_TEMP/ssh"
+          install -m 600 /dev/null "$RUNNER_TEMP/ssh/deploy_key"
+          printf '%s\n' "$DEPLOY_SSH_KEY" > "$RUNNER_TEMP/ssh/deploy_key"
+          printf '%s\n' "$DEPLOY_KNOWN_HOSTS" > "$RUNNER_TEMP/ssh/known_hosts"
+
+      - name: Upload backend
+        env:
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+          DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
+        run: |
+          scp -i "$RUNNER_TEMP/ssh/deploy_key" \
+            -o UserKnownHostsFile="$RUNNER_TEMP/ssh/known_hosts" \
+            -o StrictHostKeyChecking=yes \
+            backend-deploy.tgz "$DEPLOY_USER@$DEPLOY_HOST:/tmp/backend-deploy.tgz"
+
+      - name: Deploy backend container
+        env:
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+          DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
+        run: |
+          ssh -i "$RUNNER_TEMP/ssh/deploy_key" \
+            -o UserKnownHostsFile="$RUNNER_TEMP/ssh/known_hosts" \
+            -o StrictHostKeyChecking=yes "$DEPLOY_USER@$DEPLOY_HOST" 'bash -se' <<'REMOTE'
+          set -eu
+          base=/opt/ai-invoice-processor
+          mkdir -p "$base/backend"
+          docker network inspect ai-invoice-network >/dev/null 2>&1 || docker network create ai-invoice-network
+          if [ ! -f "$base/.env" ]; then
+            umask 077
+            printf 'POSTGRES_DB=invoices\nPOSTGRES_USER=invoice\nPOSTGRES_PASSWORD=%s\nALLOWED_ORIGINS=http://3.215.212.37\n' \
+              "$(openssl rand -hex 32)" > "$base/.env"
+          fi
+          chmod 600 "$base/.env"
+          tar -xzf /tmp/backend-deploy.tgz -C "$base/backend"
+          rm -f /tmp/backend-deploy.tgz
+          cd "$base/backend"
+          docker compose --env-file ../.env -f docker-compose.prod.yml up -d --build backend db
+          docker compose --env-file ../.env -f docker-compose.prod.yml ps
+          container="$(docker compose --env-file ../.env -f docker-compose.prod.yml ps -q backend)"
+          test -n "$container"
+          test "$(docker inspect --format '{{.State.Health.Status}}' "$container")" = healthy
+          REMOTE
