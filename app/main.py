@@ -24,7 +24,9 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     @app.exception_handler(HTTPException)
     async def http_exception_handler(_, exc: HTTPException) -> JSONResponse:
-        detail = exc.detail if isinstance(exc.detail, str) else "La solicitud no es válida."
+        detail = (
+            exc.detail if isinstance(exc.detail, str) else "La solicitud no es válida."
+        )
         return JSONResponse(
             status_code=exc.status_code,
             content={"error": {"code": f"HTTP_{exc.status_code}", "message": detail}},
@@ -64,7 +66,9 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         return []
 
     @app.post("/api/invoices", status_code=status.HTTP_202_ACCEPTED, tags=["invoices"])
-    async def upload_invoice(file: Annotated[UploadFile, File(...)]) -> dict[str, str | int]:
+    async def upload_invoice(
+        file: Annotated[UploadFile, File(...)],
+    ) -> dict[str, str | int]:
         if file.content_type not in ALLOWED_CONTENT_TYPES:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
