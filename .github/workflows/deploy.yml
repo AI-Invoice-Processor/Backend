@@ -33,7 +33,7 @@ jobs:
         run: pytest
 
       - name: Package deployment
-        run: tar --exclude=.git --exclude=.venv --exclude=__pycache__ --exclude=.env -czf backend-deploy.tgz .
+        run: tar --exclude=.git --exclude=.venv --exclude=__pycache__ --exclude=.env --exclude=backend-deploy.tgz -czf backend-deploy.tgz .
 
       - name: Configure SSH
         env:
@@ -80,5 +80,11 @@ jobs:
           docker compose --env-file ../.env -f docker-compose.prod.yml ps
           container="$(docker compose --env-file ../.env -f docker-compose.prod.yml ps -q backend)"
           test -n "$container"
-          test "$(docker inspect --format '{{.State.Health.Status}}' "$container")" = healthy
+          for attempt in $(seq 1 20); do
+            health="$(docker inspect --format '{{.State.Health.Status}}' "$container")"
+            [ "$health" = healthy ] && exit 0
+            [ "$health" = unhealthy ] && exit 1
+            sleep 3
+          done
+          exit 1
           REMOTE
