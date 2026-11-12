@@ -51,6 +51,13 @@ def list_invoices(
 @router.post(
     "/{invoice_id}/matching",
     summary="Buscar y asociar documentos relacionados (Etapa 3)",
+    description=(
+        "Reejecuta la Etapa 3 usando los datos de la factura persistidos por la "
+        "Etapa 2. No requiere body JSON: el proveedor se busca primero por "
+        "`nit_base`, la orden por `order_number` y RapidFuzz solo se aplica al "
+        "nombre del proveedor como fallback. Si la coincidencia es ambigua, "
+        "devuelve candidatos sin asociar automáticamente."
+    ),
     response_description="La factura fue asociada contra los datos maestros disponibles.",
     responses={404: {"description": "Factura no encontrada."}},
     response_model=InvoiceMatchingResponse,
