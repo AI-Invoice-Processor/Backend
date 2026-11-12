@@ -333,27 +333,29 @@ def _run() -> int:
                         }
                     )
 
-        with psycopg.connect(args.database_url) as connection:
-            with connection.cursor() as cur:
-                cur.execute(
-                    """
-                    SELECT d.processing_stage, d.processing_status, i.match_status,
-                           COUNT(*)
-                      FROM documents d
-                      JOIN invoices i ON i.document_id = d.id
-                     GROUP BY d.processing_stage, d.processing_status, i.match_status
-                     ORDER BY d.processing_stage, d.processing_status, i.match_status
-                    """
-                )
-                database_summary = [
-                    {
-                        "processing_stage": row[0],
-                        "processing_status": row[1],
-                        "match_status": row[2],
-                        "count": row[3],
-                    }
-                    for row in cur.fetchall()
-                ]
+        with (
+            psycopg.connect(args.database_url) as connection,
+            connection.cursor() as cur,
+        ):
+            cur.execute(
+                """
+                SELECT d.processing_stage, d.processing_status, i.match_status,
+                       COUNT(*)
+                  FROM documents d
+                  JOIN invoices i ON i.document_id = d.id
+                 GROUP BY d.processing_stage, d.processing_status, i.match_status
+                 ORDER BY d.processing_stage, d.processing_status, i.match_status
+                """
+            )
+            database_summary = [
+                {
+                    "processing_stage": row[0],
+                    "processing_status": row[1],
+                    "match_status": row[2],
+                    "count": row[3],
+                }
+                for row in cur.fetchall()
+            ]
     finally:
         extraction_service._call_claude_extractor = original_extractor
 
