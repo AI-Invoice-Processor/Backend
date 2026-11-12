@@ -8,6 +8,11 @@ services:
       DATABASE_URL: ${DATABASE_URL:-postgresql://invoice:${POSTGRES_PASSWORD:-local-dev-password-change-me}@db:5432/invoices}
       ALLOWED_ORIGINS: ${ALLOWED_ORIGINS:-http://localhost:5173,http://localhost}
       ENVIRONMENT: ${ENVIRONMENT:-production}
+      DOCUMENTS_DIR: /data/documents
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      ANTHROPIC_MODEL: ${ANTHROPIC_MODEL:-claude-sonnet-4-6}
+    volumes:
+      - documents-data:/data/documents
     depends_on:
       db:
         condition: service_healthy
