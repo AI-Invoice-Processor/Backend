@@ -2,7 +2,37 @@
 
 API base del proyecto AI Invoice Processor construida con FastAPI. La lógica OCR, IA, reglas contables y persistencia de facturas se integrarán en fases posteriores.
 
-## Desarrollo
+## Desarrollo Local con Docker
+
+Para levantar el entorno completo de desarrollo (FastAPI con hot-reload en `localhost:8000` y PostgreSQL en `localhost:5432`):
+
+1. **Crear la red Docker (solo la primera vez):**
+   ```bash
+   docker network create ai-invoice-network 2>/dev/null || true
+   ```
+
+2. **Configurar variables de entorno:**
+   ```bash
+   cp .env.example .env
+   ```
+   Abre `.env` y coloca tu `ANTHROPIC_API_KEY` para que la extracción con IA funcione.
+
+3. **Iniciar los servicios:**
+   ```bash
+   docker compose -f docker-compose.local.yml up --build
+   ```
+
+4. **Crear tablas y poblar la base de datos (Seed):**
+   Una vez que el contenedor esté corriendo, inicializa el esquema y carga los datos sintéticos con:
+   ```bash
+   # Desde el entorno virtual local (apuntando a localhost:5432):
+   export SEED_DATA_DIR="/ruta/a/tus/archivos_csv"
+   python -m app.seed
+   ```
+
+---
+
+## Desarrollo Local con Python Nativo
 
 ```bash
 python -m venv .venv
