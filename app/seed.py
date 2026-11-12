@@ -143,9 +143,7 @@ def seed_database(seed_dir: Path = DEFAULT_SEED_DIR) -> None:
             supplier_id = supplier_uuid_by_csv_id[row["proveedor_id"].strip()]
             raw_contract_id = row["contrato_id"].strip()
             contract_id = (
-                contract_uuid_by_csv_id[raw_contract_id]
-                if raw_contract_id
-                else None
+                contract_uuid_by_csv_id[raw_contract_id] if raw_contract_id else None
             )
             cur.execute(
                 """
