@@ -34,10 +34,10 @@ ALLOWED_TRANSITIONS: dict[InvoiceStatus, set[InvoiceStatus]] = {
         InvoiceStatus.EXCEPCION,
     },
     InvoiceStatus.EXCEPCION: {
-        InvoiceStatus.VALIDADA,   # Vía acción humana: (corregida) + revalidación
+        InvoiceStatus.VALIDADA,  # Vía acción humana: (corregida) + revalidación
         InvoiceStatus.RECHAZADA,  # Vía acción humana: rechazo definitivo
     },
-    InvoiceStatus.APROBADA: set(),   # Estado terminal
+    InvoiceStatus.APROBADA: set(),  # Estado terminal
     InvoiceStatus.RECHAZADA: set(),  # Estado terminal
 }
 
