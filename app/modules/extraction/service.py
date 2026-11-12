@@ -62,6 +62,11 @@ class _RawEvidence(BaseModel):
     text: str
 
 
+class _RawConfidence(BaseModel):
+    field: str
+    score: float
+
+
 class _RawLLMExtraction(BaseModel):
     nit_raw: str | None = None
     supplier_name: str | None = None
@@ -77,8 +82,10 @@ class _RawLLMExtraction(BaseModel):
     retentions_total_raw: str | None = None
     net_payable_raw: str | None = None
     evidence: list[_RawEvidence] = Field(default_factory=list)
-    field_confidences: dict[str, float] = Field(default_factory=dict)
+    field_confidences: list[_RawConfidence] = Field(default_factory=list)
 
+
+_EXTRACTION_TOOL_NAME = "registrar_factura"
 
 SYSTEM_PROMPT = """Eres un extractor contable de facturas electrónicas colombianas.
 Reglas estrictas:
@@ -105,21 +112,42 @@ def _call_claude_extractor(document_text: str) -> _RawLLMExtraction:
     if not settings.anthropic_api_key:
         raise RuntimeError("ANTHROPIC_API_KEY no está configurada en el entorno.")
 
-    client = anthropic.Anthropic(api_key=settings.anthropic_api_key)
-    response = client.messages.parse(
+    client = anthropic.Anthropic(
+        api_key=settings.anthropic_api_key,
+        max_retries=1,
+        timeout=60.0,
+    )
+    # Tool use forzado en lugar de output_format: con este esquema la salida
+    # estructurada tardaba >2.5 min; con tool use responde en ~12 s.
+    response = client.messages.create(
         model=settings.anthropic_model,
         max_tokens=2048,
-        temperature=0,
         system=SYSTEM_PROMPT,
+        tools=[
+            {
+                "name": _EXTRACTION_TOOL_NAME,
+                "description": "Registra los campos extraídos de la factura.",
+                "input_schema": _RawLLMExtraction.model_json_schema(),
+            }
+        ],
+        tool_choice={"type": "tool", "name": _EXTRACTION_TOOL_NAME},
         messages=[
             {
                 "role": "user",
-                "content": f"Extrae los campos de la siguiente factura:\n\n{document_text}",
+                "content": (
+                    f"Extrae los campos de la siguiente factura:\n\n{document_text}"
+                ),
             }
         ],
-        output_format=_RawLLMExtraction,
     )
-    return response.parsed_output
+    tool_block = next(
+        (block for block in response.content if block.type == "tool_use"), None
+    )
+    if tool_block is None:
+        raise RuntimeError(
+            f"Claude no devolvió la extracción (stop_reason={response.stop_reason})."
+        )
+    return _RawLLMExtraction.model_validate(tool_block.input)
 
 
 def extract_invoice_document(
@@ -134,7 +162,7 @@ def extract_invoice_document(
 
     # 1. Lectura híbrida (PyMuPDF o OpenCV + Tesseract)
     doc_text = extract_document_text(file_path)
-    clean_chars = len(doc_text.full_text.strip())
+    clean_chars = sum(len(text.strip()) for _, text in doc_text.pages_text)
 
     if clean_chars < 30:
         output = InvoiceExtractionOutput(
@@ -247,9 +275,7 @@ def extract_invoice_document(
     )
 
     # Calcular confianza global combinando OCR + confianza reportada por campo
-    field_scores = [
-        max(0.0, min(1.0, float(v))) for v in raw.field_confidences.values()
-    ]
+    field_scores = [max(0.0, min(1.0, float(c.score))) for c in raw.field_confidences]
     llm_conf = sum(field_scores) / len(field_scores) if field_scores else 0.90
     overall_conf = round(min(doc_text.ocr_confidence, llm_conf), 4)
 
@@ -289,8 +315,8 @@ def extract_invoice_document(
         confidence=ExtractionConfidence(
             overall=overall_conf,
             fields={
-                k: round(max(0.0, min(1.0, float(v))), 4)
-                for k, v in raw.field_confidences.items()
+                c.field: round(max(0.0, min(1.0, float(c.score))), 4)
+                for c in raw.field_confidences
             },
         ),
         errors=errors,
@@ -299,6 +325,84 @@ def extract_invoice_document(
 
     # 4. Persistencia en PostgreSQL
     extraction_payload = output.model_dump(mode="json")
+
+    # Verificar duplicidad por (supplier_nit_base, prefix, number) antes de actualizar
+    duplicate_of_id: UUID | None = None
+    if nit_base and prefix and number:
+        cur.execute(
+            """
+            SELECT id
+              FROM invoices
+             WHERE supplier_nit_base = %s
+               AND prefix = %s
+               AND number = %s
+               AND id <> %s
+             LIMIT 1
+            """,
+            (nit_base, prefix, number, invoice_id),
+        )
+        dup_row = cur.fetchone()
+        if dup_row:
+            duplicate_of_id = dup_row[0]
+
+    if duplicate_of_id is not None:
+        cur.execute(
+            """
+            UPDATE invoices
+               SET supplier_nit_base = %s,
+                   supplier_dv = %s,
+                   supplier_name = %s,
+                   issue_date = %s,
+                   currency = %s,
+                   subtotal = %s,
+                   total = %s,
+                   retentions_total = %s,
+                   net_payable = %s,
+                   po_reference = %s,
+                   extraction_method = %s,
+                   extraction_confidence = %s,
+                   extraction_json = %s::jsonb,
+                   updated_at = now()
+             WHERE id = %s
+            """,
+            (
+                nit_base,
+                dv,
+                raw.supplier_name,
+                issue_date,
+                extracted_data.currency,
+                subtotal,
+                total,
+                retentions_total,
+                net_payable,
+                raw.purchase_order_reference,
+                doc_text.method.value,
+                Decimal(str(overall_conf)),
+                json.dumps(extraction_payload),
+                invoice_id,
+            ),
+        )
+        cur.execute(
+            """
+            UPDATE documents
+               SET processing_stage = 'extraction',
+                   processing_status = 'success',
+                   duplicate_of_invoice_id = %s
+             WHERE id = %s
+            """,
+            (duplicate_of_id, document_id),
+        )
+        transition_invoice_status(
+            cur,
+            invoice_id=invoice_id,
+            to_status=InvoiceStatus.EXCEPCION,
+            event_type="DUPLICATE_INVOICE",
+            actor_type="system",
+            actor_name="db-unique-guard",
+            reason=f"Factura duplicada de {prefix}-{number} (NIT {nit_base}).",
+            payload={"duplicate_of_invoice_id": str(duplicate_of_id)},
+        )
+        return output
 
     cur.execute(
         """
@@ -393,7 +497,10 @@ def extract_invoice_document(
             event_type="BAJA_CONFIANZA_OCR",
             actor_type="ai",
             actor_name="claude-extractor",
-            reason=f"Confianza de extracción baja ({overall_conf:.2f}) o campos críticos faltantes.",
+            reason=(
+                f"Confianza de extracción baja ({overall_conf:.2f}) "
+                "o campos críticos faltantes."
+            ),
             payload={"overall_confidence": overall_conf},
         )
     else:

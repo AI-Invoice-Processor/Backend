@@ -17,6 +17,7 @@ from app.modules.extraction.parsers import (
     split_nit,
 )
 from app.modules.extraction.service import (
+    _RawConfidence,
     _RawEvidence,
     _RawLine,
     _RawLLMExtraction,
@@ -170,12 +171,12 @@ def test_extract_invoice_fe9001_success(
                 text="TOTAL FACTURA: $61.880.000",
             )
         ],
-        field_confidences={
-            "supplier.nit_base": 0.99,
-            "supplier.dv": 0.95,
-            "total": 0.97,
-            "lines[0].quantity": 0.96,
-        },
+        field_confidences=[
+            _RawConfidence(field="supplier.nit_base", score=0.99),
+            _RawConfidence(field="supplier.dv", score=0.95),
+            _RawConfidence(field="total", score=0.97),
+            _RawConfidence(field="lines[0].quantity", score=0.96),
+        ],
     )
 
     monkeypatch.setattr(
@@ -186,7 +187,7 @@ def test_extract_invoice_fe9001_success(
     inv_id = uuid4()
     cur = MagicMock()
     # Simula consulta FOR UPDATE de transition_invoice_status: ('RECIBIDA', doc_id)
-    cur.fetchone.return_value = ("RECIBIDA", doc_id)
+    cur.fetchone.side_effect = [None, ("RECIBIDA", doc_id)]
 
     output = extract_invoice_document(
         cur=cur,
@@ -242,7 +243,7 @@ def test_extract_preserves_arithmetic_error_without_fixing(
             )
         ],
         total_raw="$59.550.000",
-        field_confidences={"total": 0.98},
+        field_confidences=[_RawConfidence(field="total", score=0.98)],
     )
 
     monkeypatch.setattr(service, "_call_claude_extractor", lambda _text: fake_bad_sum)
@@ -250,7 +251,7 @@ def test_extract_preserves_arithmetic_error_without_fixing(
     doc_id = uuid4()
     inv_id = uuid4()
     cur = MagicMock()
-    cur.fetchone.return_value = ("RECIBIDA", doc_id)
+    cur.fetchone.side_effect = [None, ("RECIBIDA", doc_id)]
 
     output = extract_invoice_document(
         cur=cur,

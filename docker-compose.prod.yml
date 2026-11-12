@@ -44,3 +44,5 @@ networks:
 volumes:
   postgres-data:
     name: ai-invoice-postgres-data
+  documents-data:
+    name: ai-invoice-documents-data

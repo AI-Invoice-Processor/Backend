@@ -17,6 +17,8 @@ RUN pip install --no-cache-dir -r requirements.txt \
 
 COPY app ./app
 
+RUN mkdir -p /data/documents && chown -R appuser:appuser /data/documents
+
 USER appuser
 EXPOSE 8000
 
