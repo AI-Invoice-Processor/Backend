@@ -1,6 +1,8 @@
 import hashlib
+from datetime import date, datetime
 from typing import Annotated, Any
 from uuid import UUID, uuid4
+from zoneinfo import ZoneInfo
 
 import psycopg
 from fastapi import (
@@ -12,6 +14,7 @@ from fastapi import (
     UploadFile,
     status,
 )
+from pydantic import ValidationError
 
 import app.main as main_module
 from app.api.dependencies import Settings, get_db, get_settings
@@ -22,8 +25,16 @@ from app.modules.invoices import (
     record_initial_invoice,
 )
 from app.modules.matching import InvoiceNotFoundError, match_invoice_from_db
+from app.modules.validation.repository import (
+    InvoiceNotFoundError as ValidationInvoiceNotFoundError,
+)
+from app.modules.validation.repository import (
+    ValidationConflictError,
+    validate_invoice_from_db,
+)
 from app.schemas.invoice import InvoiceDetail, InvoiceListItem, UploadInvoiceResponse
 from app.schemas.matching import InvoiceMatchingResponse
+from app.schemas.validation import ValidationOutput
 
 router = APIRouter(prefix="/api/invoices", tags=["invoices"])
 
@@ -185,3 +196,46 @@ def upload_invoice(
         "extraction": extraction.model_dump(mode="json"),
         "matching": matching.model_dump(mode="json") if matching else None,
     }
+
+
+@router.post(
+    "/{invoice_id}/validation",
+    response_model=ValidationOutput,
+    summary="Ejecutar validación financiera determinista (Etapa 4)",
+)
+def validate_invoice(
+    invoice_id: UUID,
+    conn: Annotated[psycopg.Connection, Depends(get_db)],
+    settings: Annotated[Settings, Depends(get_settings)],
+    reference_date: date | None = None,
+) -> ValidationOutput:
+    if reference_date is not None and settings.environment.lower() not in {
+        "development",
+        "test",
+        "testing",
+    }:
+        raise HTTPException(
+            status_code=400,
+            detail="reference_date solo está disponible en desarrollo/pruebas",
+        )
+    try:
+        with conn.transaction(), conn.cursor() as cur:
+            return validate_invoice_from_db(
+                cur,
+                invoice_id,
+                settings.financial_validation,
+                reference_date or datetime.now(ZoneInfo("America/Bogota")).date(),
+            )
+    except ValidationInvoiceNotFoundError as exc:
+        raise HTTPException(status_code=404, detail="Factura no encontrada") from exc
+    except ValidationConflictError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+
+    except ValidationError as exc:
+        raise HTTPException(
+            status_code=409, detail="Datos persistidos incompatibles con validación"
+        ) from exc
+    except psycopg.Error as exc:
+        raise HTTPException(
+            status_code=503, detail="No se pudo completar la validación en PostgreSQL"
+        ) from exc
