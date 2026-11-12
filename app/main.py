@@ -1,39 +1,47 @@
-from typing import Annotated
+from collections.abc import Callable
+from typing import Any
 
-import psycopg
-from fastapi import FastAPI, File, HTTPException, UploadFile, status
+from fastapi import FastAPI, HTTPException, status
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
-from .config import Settings, get_settings
+from app.api.dependencies import get_db, get_settings
+from app.api.routers import invoices, system
+from app.config import Settings
+from app.modules.extraction import extract_invoice_document
 
-ALLOWED_CONTENT_TYPES = {"application/pdf", "image/png", "image/jpeg"}
+__all__ = ["app", "create_app", "extract_invoice_document"]
 
 
-def create_app(settings: Settings | None = None) -> FastAPI:
+def create_app(
+    settings: Settings | None = None,
+    db_dependency: Callable[..., Any] | None = None,
+) -> FastAPI:
     config = settings or get_settings()
+
     app = FastAPI(
         title=config.app_name,
         description=(
             "API para recepción y procesamiento de facturas. "
             "La documentación interactiva está disponible en /api/docs."
         ),
-        version="0.1.0",
+        version="0.2.0",
         docs_url="/api/docs",
         redoc_url="/api/redoc",
         openapi_url="/api/openapi.json",
         openapi_tags=[
             {
                 "name": "system",
-                "description": "Comprobaciones de estado y disponibilidad del servicio.",
+                "description": "Comprobaciones de estado y disponibilidad.",
             },
             {
                 "name": "invoices",
-                "description": "Operaciones de recepción y consulta de facturas.",
+                "description": "Operaciones de recepción, extracción y consulta.",
             },
         ],
     )
+
     app.add_middleware(
         CORSMiddleware,
         allow_origins=config.cors_origins,
@@ -42,6 +50,13 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         allow_headers=["*"],
     )
 
+    # Dependency overrides si se pasan en create_app
+    if settings is not None:
+        app.dependency_overrides[get_settings] = lambda: settings
+    if db_dependency is not None:
+        app.dependency_overrides[get_db] = db_dependency
+
+    # Exception handlers
     @app.exception_handler(HTTPException)
     async def http_exception_handler(_, exc: HTTPException) -> JSONResponse:
         detail = (
@@ -64,75 +79,9 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             },
         )
 
-    @app.get(
-        "/health",
-        tags=["system"],
-        summary="Comprobar estado del servicio",
-        response_description="El servicio está activo.",
-    )
-    async def health() -> dict[str, str]:
-        return {"status": "healthy", "service": "backend"}
-
-    @app.get(
-        "/ready",
-        tags=["system"],
-        summary="Comprobar disponibilidad de dependencias",
-        response_description="El servicio y PostgreSQL están disponibles.",
-        responses={503: {"description": "La base de datos no está disponible."}},
-    )
-    async def ready() -> dict[str, str]:
-        try:
-            with psycopg.connect(config.database_url, connect_timeout=3) as connection:
-                connection.execute("SELECT 1")
-        except psycopg.Error as exc:
-            raise HTTPException(
-                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-                detail="La base de datos no está disponible.",
-            ) from exc
-        return {"status": "ready", "service": "backend"}
-
-    @app.get(
-        "/api/invoices",
-        tags=["invoices"],
-        summary="Listar facturas",
-        response_description="Lista de facturas procesadas.",
-    )
-    async def list_invoices() -> list[dict[str, str]]:
-        """Contrato inicial; la persistencia real se incorporará en la siguiente fase."""
-        return []
-
-    @app.post(
-        "/api/invoices",
-        status_code=status.HTTP_202_ACCEPTED,
-        tags=["invoices"],
-        summary="Cargar una factura",
-        response_description="La factura fue aceptada para procesamiento.",
-        responses={
-            400: {"description": "Tipo de archivo no permitido."},
-            413: {"description": "El archivo supera el tamaño máximo permitido."},
-        },
-    )
-    async def upload_invoice(
-        file: Annotated[UploadFile, File(...)],
-    ) -> dict[str, str | int]:
-        if file.content_type not in ALLOWED_CONTENT_TYPES:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="El archivo debe ser PDF, PNG o JPG.",
-            )
-
-        content = await file.read(config.max_upload_size + 1)
-        if len(content) > config.max_upload_size:
-            raise HTTPException(
-                status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
-                detail="El archivo supera el tamaño máximo permitido de 10 MB.",
-            )
-
-        return {
-            "status": "accepted",
-            "filename": file.filename or "invoice",
-            "size_bytes": len(content),
-        }
+    # Routers modulares
+    app.include_router(system.router)
+    app.include_router(invoices.router)
 
     return app
 
