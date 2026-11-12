@@ -37,7 +37,9 @@ def create_app(
             },
             {
                 "name": "invoices",
-                "description": "Operaciones de recepción, extracción y consulta.",
+                "description": (
+                    "Operaciones de recepción, extracción, asociación y consulta."
+                ),
             },
         ],
     )

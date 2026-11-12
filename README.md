@@ -48,6 +48,9 @@ Endpoints iniciales:
 - `GET /ready`: comprueba la conexión con PostgreSQL.
 - `GET /api/invoices`: contrato inicial, actualmente devuelve una lista vacía.
 - `POST /api/invoices`: valida PDF, PNG y JPG de hasta 10 MB y acepta el archivo para procesamiento futuro.
+- `POST /api/invoices/{invoice_id}/matching`: ejecuta nuevamente la Etapa 3 y asocia la factura contra proveedores, órdenes de compra, contratos y soportes maestros.
+
+Cuando la Etapa 2 obtiene datos de extracción, la carga de una factura también ejecuta automáticamente la Etapa 3. Las coincidencias exactas usan el NIT y el número de orden; RapidFuzz sólo se usa para nombres de proveedores y devuelve candidatos sin asociar cuando existe ambigüedad.
 
 ## Documentación de la API
 
