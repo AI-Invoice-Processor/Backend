@@ -7,3 +7,4 @@ pymupdf>=1.25.0
 pytesseract>=0.3.13
 opencv-python-headless>=4.11.0
 anthropic>=0.52.0
+rapidfuzz>=3.9.0

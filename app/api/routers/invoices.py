@@ -21,7 +21,9 @@ from app.modules.invoices import (
     list_invoices_from_db,
     record_initial_invoice,
 )
+from app.modules.matching import InvoiceNotFoundError, match_invoice_from_db
 from app.schemas.invoice import InvoiceDetail, InvoiceListItem, UploadInvoiceResponse
+from app.schemas.matching import InvoiceMatchingResponse
 
 router = APIRouter(prefix="/api/invoices", tags=["invoices"])
 
@@ -44,6 +46,34 @@ def list_invoices(
 ) -> list[InvoiceListItem]:
     with conn.cursor() as cur:
         return list_invoices_from_db(cur)
+
+
+@router.post(
+    "/{invoice_id}/matching",
+    summary="Buscar y asociar documentos relacionados (Etapa 3)",
+    description=(
+        "Reejecuta la Etapa 3 usando los datos de la factura persistidos por la "
+        "Etapa 2. No requiere body JSON: el proveedor se busca primero por "
+        "`nit_base`, la orden por `order_number` y RapidFuzz solo se aplica al "
+        "nombre del proveedor como fallback. Si la coincidencia es ambigua, "
+        "devuelve candidatos sin asociar automáticamente."
+    ),
+    response_description="La factura fue asociada contra los datos maestros disponibles.",
+    responses={404: {"description": "Factura no encontrada."}},
+    response_model=InvoiceMatchingResponse,
+)
+def match_invoice(
+    invoice_id: UUID,
+    conn: Annotated[psycopg.Connection, Depends(get_db)],
+) -> InvoiceMatchingResponse:
+    try:
+        with conn.transaction(), conn.cursor() as cur:
+            return match_invoice_from_db(cur, invoice_id)
+    except InvoiceNotFoundError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Factura no encontrada.",
+        ) from exc
 
 
 @router.get(
@@ -134,6 +164,13 @@ def upload_invoice(
             cur, invoice_id
         )
 
+    matching = None
+    if extraction.data is not None:
+        # La Etapa 3 usa los datos ya persistidos por la Etapa 2 y tiene su
+        # propia transacción para que un fallo de matching no revierta OCR.
+        with conn.transaction(), conn.cursor() as cur:
+            matching = match_invoice_from_db(cur, invoice_id)
+
     return {
         "status": "accepted",
         "filename": original_name,
@@ -146,4 +183,5 @@ def upload_invoice(
         "business_status": business_status,
         "duplicate_of_invoice_id": duplicate_of,
         "extraction": extraction.model_dump(mode="json"),
+        "matching": matching.model_dump(mode="json") if matching else None,
     }

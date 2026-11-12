@@ -1,5 +1,7 @@
 from pydantic import BaseModel, ConfigDict
 
+from app.schemas.matching import InvoiceMatchingResponse
+
 
 class InvoiceListItem(BaseModel):
     model_config = ConfigDict(extra="ignore")
@@ -91,3 +93,4 @@ class UploadInvoiceResponse(BaseModel):
     business_status: str
     duplicate_of_invoice_id: str | None = None
     extraction: dict
+    matching: InvoiceMatchingResponse | None = None
