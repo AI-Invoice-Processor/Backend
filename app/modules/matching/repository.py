@@ -82,9 +82,7 @@ def _supplier_from_row(row: tuple) -> SupplierRecord:
     )
 
 
-def find_supplier_by_nit(
-    cur: psycopg.Cursor, nit_base: str
-) -> SupplierRecord | None:
+def find_supplier_by_nit(cur: psycopg.Cursor, nit_base: str) -> SupplierRecord | None:
     cur.execute(
         """
         SELECT id, nit_base, dv, legal_name

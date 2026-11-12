@@ -137,9 +137,7 @@ def _parse_args() -> argparse.Namespace:
 def _load_dataset(dataset_dir: Path) -> dict[str, Any]:
     output_dir = dataset_dir / "salida"
     invoices = _read_csv(output_dir / "facturas.csv")
-    suppliers = {
-        row["id"]: row for row in _read_csv(output_dir / "proveedores.csv")
-    }
+    suppliers = {row["id"]: row for row in _read_csv(output_dir / "proveedores.csv")}
     lines_by_invoice: dict[str, list[dict[str, str]]] = defaultdict(list)
     for row in _read_csv(output_dir / "facturas_lineas.csv"):
         lines_by_invoice[row["factura_id"]].append(row)
@@ -150,9 +148,7 @@ def _load_dataset(dataset_dir: Path) -> dict[str, Any]:
     purchase_orders = {
         row["numero"]: row for row in _read_csv(output_dir / "ordenes_compra.csv")
     }
-    contracts = {
-        row["id"]: row for row in _read_csv(output_dir / "contratos.csv")
-    }
+    contracts = {row["id"]: row for row in _read_csv(output_dir / "contratos.csv")}
     supports_by_order_id: dict[str, list[dict[str, str]]] = defaultdict(list)
     for row in _read_csv(output_dir / "soportes.csv"):
         supports_by_order_id[row["oc_id"]].append(row)
@@ -272,8 +268,7 @@ def _run() -> int:
                 if expected_order:
                     if (
                         not order_match.get("matched")
-                        or order_match.get("order_number")
-                        != expected_order
+                        or order_match.get("order_number") != expected_order
                     ):
                         failures.append(
                             {
