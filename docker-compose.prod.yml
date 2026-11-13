@@ -11,6 +11,9 @@ services:
       DOCUMENTS_DIR: /data/documents
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
       ANTHROPIC_MODEL: ${ANTHROPIC_MODEL:-claude-sonnet-4-6}
+      TYPESAFE_API_KEY: ${TYPESAFE_API_KEY:-}
+      TYPESAFE_MODEL: ${TYPESAFE_MODEL:-jev-latest}
+      FINANCIAL_VALIDATION: ${FINANCIAL_VALIDATION:-}
     volumes:
       - documents-data:/data/documents
     depends_on:

@@ -51,6 +51,7 @@ class ClaudeProposalExplainer:
             validation_exceptions=[
                 e.model_dump() for e in input_data.validation_exceptions
             ],
+            passed_checks=[c.model_dump() for c in input_data.passed_checks],
             risk_assessment=input_data.risk_assessment.model_dump(),
             document_references=doc_refs,
         )

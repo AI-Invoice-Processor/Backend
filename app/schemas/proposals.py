@@ -56,6 +56,25 @@ class ValidationExceptionItem(BaseModel):
     description: str | None = Field(
         default=None, description="Descripción del hallazgo"
     )
+    rule_id: str | None = Field(
+        default=None,
+        description="Regla de Etapa 4 que generó la excepción (V1..V7, D2)",
+    )
+    reason_code: str | None = Field(
+        default=None,
+        description="Código del motivo (ej. AMOUNT_MISMATCH, MISSING_DATA)",
+    )
+    invoice_line_no: int | None = Field(
+        default=None, description="Línea de la factura afectada, si aplica"
+    )
+
+
+class PassedCheckItem(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+
+    rule_id: str
+    invoice_line_no: int | None = None
+    reason: str
 
 
 class RiskAssessmentContextInput(BaseModel):
@@ -112,6 +131,10 @@ class Stage6ProposalInput(BaseModel):
     validation_exceptions: list[ValidationExceptionItem] = Field(
         default_factory=list,
         description="Excepciones detectadas en Etapa 4",
+    )
+    passed_checks: list[PassedCheckItem] = Field(
+        default_factory=list,
+        description="Controles de Etapa 4 que pasaron (contexto para no especular)",
     )
     risk_assessment: RiskAssessmentContextInput = Field(
         default_factory=RiskAssessmentContextInput,

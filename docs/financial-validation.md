@@ -35,9 +35,13 @@ Diferencia = declarado − esperado; porcentaje sobre valor absoluto esperado;
 si esperado es cero, porcentaje null. V1–V4 y D2 cuantizan ambos valores con el
 redondeo explícito antes de comparar. No se restan retenciones de V4.
 
-Un descuento null se considera incierto. Solo cero explícito o
-`known_no_discount_lines` en la entrada pura acredita ausencia conocida. El
-adaptador persistente no inventa esa información. No hay IVA, tarifa no soportada,
+Un descuento null se trata así en V1: cero explícito o `known_no_discount_lines`
+acreditan ausencia conocida; si no, se infiere descuento cero solo cuando
+cantidad × unitario = importe dentro de la tolerancia aritmética
+(`NO_DISCOUNT_INFERRED`), porque la aritmética misma evidencia que no hubo
+descuento. Si el importe no cuadra sin descuento, V1 queda `not_evaluated` con
+`UNCERTAIN_DISCOUNT`: no se puede distinguir un descuento no declarado de un
+error aritmético. No hay IVA, tarifa no soportada,
 impuestos distintos de IVA o datos incompletos: no se presume validez.
 V5 usa los pesos proporcionados por el tutor, sin verificar existencia del emisor.
 
