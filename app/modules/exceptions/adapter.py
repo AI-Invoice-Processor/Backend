@@ -5,18 +5,19 @@ It strictly receives structured python findings and context (never raw document 
 and interacts with the official typesafe-sdk TypeSafeClient.
 """
 
+import asyncio
 import logging
 import time
 from typing import Any
 
 from typesafe_sdk import (
+    AsyncTypeSafeClient,
     ChoiceAnswer,
     NoulAnswer,
     TypeSafeAPIConnectionError,
     TypeSafeAPIError,
     TypeSafeAPITimeoutError,
     TypeSafeAuthenticationError,
-    TypeSafeClient,
     TypeSafeError,
     TypeSafeRateLimitError,
 )
@@ -80,15 +81,15 @@ class JevExceptionAdapter:
         self.api_key = api_key
         self.model = model or "jev-latest"
 
-    def evaluate_findings(
+    async def evaluate_findings(
         self,
         *,
         findings: list[dict[str, Any]],
         context: dict[str, Any],
     ) -> JevJudgmentResult:
-        """Send computed findings and validation context to Jev in a single bundled request.
+        """Send computed findings and validation context to Jev in a single bundled request asynchronously.
 
-        Never sends raw documents.
+        Never sends raw documents. Uses non-blocking I/O.
         """
         if not self.api_key:
             raise JevAuthenticationError("TYPESAFE_API_KEY no está configurada")
@@ -103,8 +104,10 @@ class JevExceptionAdapter:
 
         start_time = time.perf_counter()
         try:
-            with TypeSafeClient(api_key=self.api_key, model=self.model) as client:
-                response = client.system_one(
+            async with AsyncTypeSafeClient(
+                api_key=self.api_key, model=self.model
+            ) as client:
+                response = await client.system_one(
                     state=state,
                     questions=questions,
                 )
@@ -174,3 +177,26 @@ class JevExceptionAdapter:
             model_version=response.model or self.model,
             raw_state=state,
         )
+
+    def evaluate_findings_sync(
+        self,
+        *,
+        findings: list[dict[str, Any]],
+        context: dict[str, Any],
+    ) -> JevJudgmentResult:
+        """Synchronous wrapper for contexts where an event loop is not already running."""
+        try:
+            loop = asyncio.get_running_loop()
+        except RuntimeError:
+            loop = None
+
+        if loop and loop.is_running():
+            import concurrent.futures
+
+            with concurrent.futures.ThreadPoolExecutor(max_workers=1) as pool:
+                return pool.submit(
+                    lambda: asyncio.run(
+                        self.evaluate_findings(findings=findings, context=context)
+                    )
+                ).result()
+        return asyncio.run(self.evaluate_findings(findings=findings, context=context))

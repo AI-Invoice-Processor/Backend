@@ -1,5 +1,6 @@
-"""Claude API service for generating structured exception explanations."""
+"""Claude API service for generating structured exception explanations asynchronously."""
 
+import asyncio
 import logging
 import time
 from typing import Any
@@ -21,16 +22,20 @@ class ClaudeServiceError(Exception):
 
 
 class ClaudeProposalExplainer:
-    """Invokes Anthropic Claude API using Structured Tool Outputs to explain accounting exceptions."""
+    """Invokes Anthropic Claude API using Structured Tool Outputs asynchronously.
+
+    Ensures non-blocking I/O so the FastAPI event loop can serve other concurrent
+    requests while awaiting Claude's response.
+    """
 
     def __init__(self, api_key: str | None = None, model: str = "claude-sonnet-4-6"):
         self.api_key = api_key
         self.model = model
 
-    def explain_exceptions(
+    async def explain_exceptions(
         self, input_data: Stage6ProposalInput
     ) -> tuple[Explanation, ProposalMetadata]:
-        """Generate structured explanation using Claude API or graceful fallback if unreachable."""
+        """Generate structured explanation asynchronously using Claude API without blocking the thread."""
         if not self.api_key:
             logger.warning(
                 "ANTHROPIC_API_KEY no configurada. Usando generador contextual determinista de contingencia."
@@ -58,19 +63,21 @@ class ClaudeProposalExplainer:
 
         start_time = time.perf_counter()
         try:
-            client = anthropic.Anthropic(api_key=self.api_key)
-            message = client.messages.create(
-                model=self.model,
-                max_tokens=2048,
-                system=EXPLANATION_SYSTEM_PROMPT,
-                tools=[EXPLANATION_TOOL_SCHEMA],
-                tool_choice={"type": "tool", "name": "generate_accounting_explanation"},
-                messages=[{"role": "user", "content": user_prompt}],
-            )
+            # Fully non-blocking async HTTP request via AsyncAnthropic
+            async with anthropic.AsyncAnthropic(api_key=self.api_key) as client:
+                message = await client.messages.create(
+                    model=self.model,
+                    max_tokens=2048,
+                    system=EXPLANATION_SYSTEM_PROMPT,
+                    tools=[EXPLANATION_TOOL_SCHEMA],
+                    tool_choice={
+                        "type": "tool",
+                        "name": "generate_accounting_explanation",
+                    },
+                    messages=[{"role": "user", "content": user_prompt}],
+                )
         except anthropic.AnthropicError as exc:
-            logger.warning(
-                "Error invocando Claude API para explicación contable: %s", exc
-            )
+            logger.warning("Error invocando Claude API de forma asíncrona: %s", exc)
             return self._fallback_explanation(
                 input_data, reason=f"Fallo en Claude API: {exc}"
             )
@@ -116,6 +123,24 @@ class ClaudeProposalExplainer:
         )
 
         return explanation, metadata
+
+    def explain_exceptions_sync(
+        self, input_data: Stage6ProposalInput
+    ) -> tuple[Explanation, ProposalMetadata]:
+        """Synchronous wrapper for contexts where an event loop is not running."""
+        try:
+            loop = asyncio.get_running_loop()
+        except RuntimeError:
+            loop = None
+
+        if loop and loop.is_running():
+            import concurrent.futures
+
+            with concurrent.futures.ThreadPoolExecutor(max_workers=1) as pool:
+                return pool.submit(
+                    lambda: asyncio.run(self.explain_exceptions(input_data))
+                ).result()
+        return asyncio.run(self.explain_exceptions(input_data))
 
     def _fallback_explanation(
         self, input_data: Stage6ProposalInput, reason: str

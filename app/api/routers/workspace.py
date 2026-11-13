@@ -236,7 +236,9 @@ def _case(cur: psycopg.Cursor, invoice_id: UUID, settings: Settings) -> dict | N
     }
 
 
-def _ensure_pipeline(cur: psycopg.Cursor, invoice_id: UUID, settings: Settings) -> None:
+async def _ensure_pipeline(
+    cur: psycopg.Cursor, invoice_id: UUID, settings: Settings
+) -> None:
     cur.execute(
         "SELECT business_status, risk_level FROM invoices WHERE id = %s FOR UPDATE",
         (invoice_id,),
@@ -261,7 +263,7 @@ def _ensure_pipeline(cur: psycopg.Cursor, invoice_id: UUID, settings: Settings) 
     cur.execute("SELECT risk_level FROM invoices WHERE id = %s", (invoice_id,))
     risk_level = cur.fetchone()[0]
     if not risk_level:
-        evaluate_invoice_from_db(
+        await evaluate_invoice_from_db(
             cur,
             invoice_id,
             ExceptionEvaluatorService(
@@ -273,7 +275,7 @@ def _ensure_pipeline(cur: psycopg.Cursor, invoice_id: UUID, settings: Settings) 
         )
 
     if not get_accounting_proposal_from_db(cur, invoice_id):
-        generate_proposal_from_db(
+        await generate_proposal_from_db(
             cur,
             invoice_id,
             ProposalService(
@@ -327,19 +329,19 @@ def get_workspace_case(
 
 
 @router.post("/cases/{invoice_id}/pipeline")
-def process_workspace_case(
+async def process_workspace_case(
     invoice_id: UUID,
     conn: Annotated[psycopg.Connection, Depends(get_db)],
     settings: Annotated[Settings, Depends(get_settings)],
 ) -> dict:
     with conn.transaction(), conn.cursor() as cur:
-        _ensure_pipeline(cur, invoice_id, settings)
+        await _ensure_pipeline(cur, invoice_id, settings)
         result = _case(cur, invoice_id, settings)
     return result or {"invoice": {"invoice_id": str(invoice_id)}}
 
 
 @router.post("/pipeline")
-def process_workspace_pipeline(
+async def process_workspace_pipeline(
     conn: Annotated[psycopg.Connection, Depends(get_db)],
     settings: Annotated[Settings, Depends(get_settings)],
     limit: int = Query(default=500, ge=1, le=1000),
@@ -357,7 +359,7 @@ def process_workspace_pipeline(
     for invoice_id in invoice_ids:
         try:
             with conn.transaction(), conn.cursor() as cur:
-                _ensure_pipeline(cur, invoice_id, settings)
+                await _ensure_pipeline(cur, invoice_id, settings)
             processed.append(str(invoice_id))
         except Exception:
             logger.exception("Workspace pipeline failed for invoice %s", invoice_id)
@@ -490,7 +492,7 @@ def get_workspace_document(
 
 
 @router.post("/cases/{invoice_id}/actions")
-def apply_human_action(
+async def apply_human_action(
     invoice_id: UUID,
     payload: HumanAction,
     conn: Annotated[psycopg.Connection, Depends(get_db)],
@@ -616,6 +618,6 @@ def apply_human_action(
                     model=settings.anthropic_model,
                 )
             )
-            generate_proposal_from_db(cur, invoice_id, proposal_service)
+            await generate_proposal_from_db(cur, invoice_id, proposal_service)
         result = _case(cur, invoice_id, settings)
     return result or {"invoice": {"invoice_id": str(invoice_id)}}

@@ -1,6 +1,7 @@
 """Unit and integration tests for Stage 6: Accounting Proposal & Explanation."""
 
-from unittest.mock import MagicMock, patch
+import asyncio
+from unittest.mock import AsyncMock, MagicMock, patch
 from uuid import uuid4
 
 import pytest
@@ -114,11 +115,12 @@ def exception_invoice_input() -> Stage6ProposalInput:
 
 
 # 1. Clean invoice: Must use TEMPLATE, never call Claude
-def test_clean_invoice_uses_template_without_claude(clean_invoice_input):
+@pytest.mark.anyio
+async def test_clean_invoice_uses_template_without_claude(clean_invoice_input):
     mock_claude = MagicMock(spec=ClaudeProposalExplainer)
     service = ProposalService(claude_explainer=mock_claude)
 
-    output = service.generate_proposal(clean_invoice_input)
+    output = await service.generate_proposal(clean_invoice_input)
 
     assert output.schema_version == "0.2.0"
     assert output.invoice_id == clean_invoice_input.invoice_id
@@ -134,25 +136,28 @@ def test_clean_invoice_uses_template_without_claude(clean_invoice_input):
 
 
 # 2. Exception invoice: Must use CLAUDE and status BLOCKED_PENDING_REVIEW
-def test_exception_invoice_uses_claude(exception_invoice_input):
+@pytest.mark.anyio
+async def test_exception_invoice_uses_claude(exception_invoice_input):
     mock_claude = MagicMock(spec=ClaudeProposalExplainer)
-    mock_claude.explain_exceptions.return_value = (
-        Explanation(
-            summary="La factura FE-9001 supera en $2.000.000 (4%) el valor autorizado en la orden de compra OC-2026-9001.",
-            details="Se facturaron $52.000.000 frente a $50.000.000 respaldados en la orden de compra OC-2026-9001.",
-            recommendation="Solicitar nota crédito por $2.000.000 + IVA o anexar autorización escrita del área de compras.",
-        ),
-        ProposalMetadata(
-            latency_ms=1150.0,
-            input_tokens=220,
-            output_tokens=65,
-            model="claude-sonnet-4-6",
-            account_validation_status="VALIDATED",
-        ),
+    mock_claude.explain_exceptions = AsyncMock(
+        return_value=(
+            Explanation(
+                summary="La factura FE-9001 supera en $2.000.000 (4%) el valor autorizado en la orden de compra OC-2026-9001.",
+                details="Se facturaron $52.000.000 frente a $50.000.000 respaldados en la orden de compra OC-2026-9001.",
+                recommendation="Solicitar nota crédito por $2.000.000 + IVA o anexar autorización escrita del área de compras.",
+            ),
+            ProposalMetadata(
+                latency_ms=1150.0,
+                input_tokens=220,
+                output_tokens=65,
+                model="claude-sonnet-4-6",
+                account_validation_status="VALIDATED",
+            ),
+        )
     )
 
     service = ProposalService(claude_explainer=mock_claude)
-    output = service.generate_proposal(exception_invoice_input)
+    output = await service.generate_proposal(exception_invoice_input)
 
     assert output.schema_version == "0.2.0"
     assert output.generated_by == "CLAUDE"
@@ -164,27 +169,31 @@ def test_exception_invoice_uses_claude(exception_invoice_input):
 
 
 # 3. Rule: Do not invent accounts; validate against authorized accounts
-def test_accounting_code_validation_rejects_unauthorized_account(
+@pytest.mark.anyio
+async def test_accounting_code_validation_rejects_unauthorized_account(
     exception_invoice_input,
 ):
     exception_invoice_input.accounting_context.suggested_account = "9999_INVENTADA"
     mock_claude = MagicMock(spec=ClaudeProposalExplainer)
-    mock_claude.explain_exceptions.return_value = (
-        Explanation(summary="Sum", details="Det", recommendation="Rec"),
-        ProposalMetadata(latency_ms=10.0),
+    mock_claude.explain_exceptions = AsyncMock(
+        return_value=(
+            Explanation(summary="Sum", details="Det", recommendation="Rec"),
+            ProposalMetadata(latency_ms=10.0),
+        )
     )
 
     service = ProposalService(claude_explainer=mock_claude)
-    output = service.generate_proposal(exception_invoice_input)
+    output = await service.generate_proposal(exception_invoice_input)
 
     assert output.accounting_proposal.account_code is None
     assert output.metadata.account_validation_status == "PENDING_VALIDATION"
 
 
 # 4. Fallback when Claude fails or is unavailable
-def test_claude_service_fallback_on_api_error(exception_invoice_input):
+@pytest.mark.anyio
+async def test_claude_service_fallback_on_api_error(exception_invoice_input):
     explainer = ClaudeProposalExplainer(api_key=None)  # No API key triggers fallback
-    explanation, metadata = explainer.explain_exceptions(exception_invoice_input)
+    explanation, metadata = await explainer.explain_exceptions(exception_invoice_input)
 
     assert "FE-9001" in explanation.summary
     assert "DIFERENCIA_VS_OC" in explanation.summary
@@ -197,14 +206,15 @@ def test_claude_service_fallback_on_api_error(exception_invoice_input):
     assert "contingency-rules" in metadata.model
 
 
-def test_claude_fallback_explains_missing_expected_value(exception_invoice_input):
+@pytest.mark.anyio
+async def test_claude_fallback_explains_missing_expected_value(exception_invoice_input):
     exception_invoice_input.validation_exceptions[0].expected = None
     exception_invoice_input.validation_exceptions.append(
         exception_invoice_input.validation_exceptions[0].model_copy()
     )
     explainer = ClaudeProposalExplainer(api_key=None)
 
-    explanation, _ = explainer.explain_exceptions(exception_invoice_input)
+    explanation, _ = await explainer.explain_exceptions(exception_invoice_input)
 
     assert "Se detectaron 2 inconsistencias técnicas." in explanation.details
     assert "No se reportó un valor esperado" in explanation.details
@@ -306,9 +316,11 @@ def test_fastapi_proposal_endpoints(clean_invoice_input, exception_invoice_input
 
     # Exception invoice with mocked Claude
     mock_explainer = MagicMock(spec=ClaudeProposalExplainer)
-    mock_explainer.explain_exceptions.return_value = (
-        Explanation(summary="Sum", details="Det", recommendation="Rec"),
-        ProposalMetadata(latency_ms=100.0),
+    mock_explainer.explain_exceptions = AsyncMock(
+        return_value=(
+            Explanation(summary="Sum", details="Det", recommendation="Rec"),
+            ProposalMetadata(latency_ms=100.0),
+        )
     )
     with patch(
         "app.api.routers.invoices.ClaudeProposalExplainer", return_value=mock_explainer
@@ -339,7 +351,8 @@ def _with_exceptions(base: Stage6ProposalInput, exceptions) -> Stage6ProposalInp
     )
 
 
-def test_data_gap_exceptions_use_template_without_calling_claude(
+@pytest.mark.anyio
+async def test_data_gap_exceptions_use_template_without_calling_claude(
     clean_invoice_input,
 ):
     explainer = MagicMock(spec=ClaudeProposalExplainer)
@@ -362,7 +375,7 @@ def test_data_gap_exceptions_use_template_without_calling_claude(
         ],
     )
 
-    output = ProposalService(claude_explainer=explainer).generate_proposal(data)
+    output = await ProposalService(claude_explainer=explainer).generate_proposal(data)
 
     explainer.explain_exceptions.assert_not_called()
     assert output.generated_by == "TEMPLATE"
@@ -372,17 +385,22 @@ def test_data_gap_exceptions_use_template_without_calling_claude(
     assert "D2, V6" in output.explanation.details
 
 
-def test_value_mismatch_still_goes_to_claude_with_rule_context(clean_invoice_input):
+@pytest.mark.anyio
+async def test_value_mismatch_still_goes_to_claude_with_rule_context(
+    clean_invoice_input,
+):
     explainer = MagicMock(spec=ClaudeProposalExplainer)
-    explainer.explain_exceptions.return_value = (
-        Explanation(summary="s", details="d", recommendation="r"),
-        ProposalMetadata(
-            latency_ms=1.0,
-            input_tokens=1,
-            output_tokens=1,
-            model="m",
-            account_validation_status="VALIDATED",
-        ),
+    explainer.explain_exceptions = AsyncMock(
+        return_value=(
+            Explanation(summary="s", details="d", recommendation="r"),
+            ProposalMetadata(
+                latency_ms=1.0,
+                input_tokens=1,
+                output_tokens=1,
+                model="m",
+                account_validation_status="VALIDATED",
+            ),
+        )
     )
     data = _with_exceptions(
         clean_invoice_input,
@@ -399,10 +417,45 @@ def test_value_mismatch_still_goes_to_claude_with_rule_context(clean_invoice_inp
         ],
     )
 
-    output = ProposalService(claude_explainer=explainer).generate_proposal(data)
+    output = await ProposalService(claude_explainer=explainer).generate_proposal(data)
 
     explainer.explain_exceptions.assert_called_once()
     assert output.generated_by == "CLAUDE"
     sent = explainer.explain_exceptions.call_args.args[0]
     assert sent.validation_exceptions[0].rule_id == "V2"
     assert [c.rule_id for c in sent.passed_checks] == ["D2", "V6"]
+
+
+@pytest.mark.anyio
+async def test_concurrency_non_blocking_claude_io(
+    clean_invoice_input, exception_invoice_input
+):
+    """Verify that a slow Claude I/O call does not block other requests in the event loop."""
+
+    async def delayed_explain(*args, **kwargs):
+        await asyncio.sleep(0.3)
+        return (
+            Explanation(summary="Slow", details="Det", recommendation="Rec"),
+            ProposalMetadata(latency_ms=300.0),
+        )
+
+    slow_claude = MagicMock(spec=ClaudeProposalExplainer)
+    slow_claude.explain_exceptions = AsyncMock(side_effect=delayed_explain)
+    service = ProposalService(claude_explainer=slow_claude)
+
+    # Launch both concurrently
+    t0 = asyncio.get_event_loop().time()
+    task_slow = asyncio.create_task(service.generate_proposal(exception_invoice_input))
+    task_fast = asyncio.create_task(service.generate_proposal(clean_invoice_input))
+
+    fast_result = await task_fast
+    fast_elapsed = asyncio.get_event_loop().time() - t0
+
+    slow_result = await task_slow
+    total_elapsed = asyncio.get_event_loop().time() - t0
+
+    # The clean invoice (template) finished immediately (<0.1s), while slow took ~0.3s
+    assert fast_elapsed < 0.15
+    assert total_elapsed >= 0.28
+    assert fast_result.generated_by == "TEMPLATE"
+    assert slow_result.generated_by == "CLAUDE"

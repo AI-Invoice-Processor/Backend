@@ -1,5 +1,6 @@
 """Database persistence and query adapter for Stage 6 accounting proposals."""
 
+import asyncio
 import json
 from decimal import Decimal
 from uuid import UUID
@@ -144,7 +145,7 @@ def record_proposal_generated_event(
     )
 
 
-def generate_proposal_from_db(
+async def generate_proposal_from_db(
     cur,
     invoice_id: UUID,
     service: ProposalService,
@@ -345,8 +346,9 @@ def generate_proposal_from_db(
         document_references=doc_references,
     )
 
-    # 5. Execute proposal service
-    output = service.generate_proposal(input_data)
+    # 5. Execute proposal service asynchronously
+    res = service.generate_proposal(input_data)
+    output = await res if asyncio.iscoroutine(res) else res
 
     # 6. Save proposal to database
     save_accounting_proposal_to_db(
