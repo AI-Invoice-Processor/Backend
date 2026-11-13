@@ -45,10 +45,14 @@ def related_references(cur: psycopg.Cursor) -> list[tuple[str, str]]:
         ORDER BY 1
         """
     )
-    return [(str(storage_ref), str(category)) for storage_ref, category in cur.fetchall()]
+    return [
+        (str(storage_ref), str(category)) for storage_ref, category in cur.fetchall()
+    ]
 
 
-def register_documents(database_url: str, source_root: Path, documents_dir: Path) -> tuple[int, int]:
+def register_documents(
+    database_url: str, source_root: Path, documents_dir: Path
+) -> tuple[int, int]:
     source_root = source_root.resolve()
     documents_dir = documents_dir.resolve()
     documents_dir.mkdir(parents=True, exist_ok=True)
@@ -99,12 +103,31 @@ def register_documents(database_url: str, source_root: Path, documents_dir: Path
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--database-url", default=os.getenv("DATABASE_URL", "postgresql://invoice:local-dev-password-change-me@localhost:5432/invoices"))
-    parser.add_argument("--source-root", type=Path, required=True, help="Dataset PDF directory, e.g. salida/pdf")
-    parser.add_argument("--documents-dir", type=Path, default=Path(os.getenv("DOCUMENTS_DIR", "data/documents")))
+    parser.add_argument(
+        "--database-url",
+        default=os.getenv(
+            "DATABASE_URL",
+            "postgresql://invoice:local-dev-password-change-me@localhost:5432/invoices",
+        ),
+    )
+    parser.add_argument(
+        "--source-root",
+        type=Path,
+        required=True,
+        help="Dataset PDF directory, e.g. salida/pdf",
+    )
+    parser.add_argument(
+        "--documents-dir",
+        type=Path,
+        default=Path(os.getenv("DOCUMENTS_DIR", "data/documents")),
+    )
     args = parser.parse_args()
-    registered, missing = register_documents(args.database_url, args.source_root, args.documents_dir)
-    print(f"Documentos relacionados registrados: {registered}; archivos faltantes: {missing}")
+    registered, missing = register_documents(
+        args.database_url, args.source_root, args.documents_dir
+    )
+    print(
+        f"Documentos relacionados registrados: {registered}; archivos faltantes: {missing}"
+    )
 
 
 if __name__ == "__main__":
