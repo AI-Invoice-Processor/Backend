@@ -64,6 +64,9 @@ jobs:
       - name: Validate commit messages and PR title
         env:
           PR_TITLE: ${{ github.event.pull_request.title }}
-          BASE_SHA: ${{ github.event.pull_request.base.sha }}
-          HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+          # En push, valida únicamente el rango introducido por ese push.
+          # Sin este valor el validador recorría todo el historial de main y
+          # fallaba por commits antiguos que ya no pueden corregirse aquí.
+          BASE_SHA: ${{ github.event_name == 'push' && github.event.before || github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event_name == 'push' && github.sha || github.event.pull_request.head.sha || github.sha }}
         run: node scripts/validate-conventional-commits.mjs
