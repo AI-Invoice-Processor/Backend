@@ -31,6 +31,13 @@ from app.modules.invoices import (
     record_initial_invoice,
 )
 from app.modules.matching import InvoiceNotFoundError, match_invoice_from_db
+from app.modules.proposals import (
+    ClaudeProposalExplainer,
+    InvoiceNotFoundError as ProposalInvoiceNotFoundError,
+    ProposalService,
+    generate_proposal_from_db,
+    get_accounting_proposal_from_db,
+)
 from app.modules.validation.repository import (
     InvoiceNotFoundError as ValidationInvoiceNotFoundError,
 )
@@ -40,6 +47,7 @@ from app.modules.validation.repository import (
 )
 from app.schemas.exceptions import Stage5EvaluationInput, Stage5EvaluationOutput
 from app.schemas.invoice import InvoiceDetail, InvoiceListItem, UploadInvoiceResponse
+from app.schemas.proposals import Stage6ProposalInput, Stage6ProposalOutput
 from app.schemas.matching import InvoiceMatchingResponse
 from app.schemas.validation import ValidationOutput
 
@@ -297,4 +305,76 @@ def evaluate_exceptions_direct(
     )
     service = ExceptionEvaluatorService(jev_adapter=jev_adapter)
     return service.evaluate_exceptions(payload)
+
+
+@router.post(
+    "/{invoice_id}/proposals",
+    response_model=Stage6ProposalOutput,
+    summary="Generar propuesta contable y explicación de excepciones (Etapa 6)",
+    description=(
+        "Genera la propuesta de causación en accounting_proposals. "
+        "Si no hay excepciones, genera la explicación con plantilla (TEMPLATE); "
+        "si hay excepciones o revisión requerida, usa Claude (CLAUDE)."
+    ),
+)
+def create_invoice_proposal(
+    invoice_id: UUID,
+    conn: Annotated[psycopg.Connection, Depends(get_db)],
+    settings: Annotated[Settings, Depends(get_settings)],
+) -> Stage6ProposalOutput:
+    claude_explainer = ClaudeProposalExplainer(
+        api_key=settings.anthropic_api_key,
+        model=settings.anthropic_model,
+    )
+    service = ProposalService(claude_explainer=claude_explainer)
+    try:
+        with conn.transaction(), conn.cursor() as cur:
+            return generate_proposal_from_db(cur, invoice_id, service)
+    except ProposalInvoiceNotFoundError as exc:
+        raise HTTPException(status_code=404, detail="Factura no encontrada") from exc
+    except psycopg.Error as exc:
+        raise HTTPException(
+            status_code=503, detail="Error de base de datos al generar la propuesta contable"
+        ) from exc
+
+
+@router.get(
+    "/{invoice_id}/proposals",
+    response_model=Stage6ProposalOutput,
+    summary="Consultar propuesta contable vigente de una factura (Etapa 6)",
+)
+def get_invoice_proposal(
+    invoice_id: UUID,
+    conn: Annotated[psycopg.Connection, Depends(get_db)],
+) -> Stage6ProposalOutput:
+    with conn.cursor() as cur:
+        proposal = get_accounting_proposal_from_db(cur, invoice_id)
+        if not proposal:
+            raise HTTPException(
+                status_code=404,
+                detail="No existe propuesta contable generada para esta factura",
+            )
+        return proposal
+
+
+@router.post(
+    "/proposals",
+    response_model=Stage6ProposalOutput,
+    summary="Generar propuesta contable directa (Etapa 6 sin DB)",
+    description=(
+        "Genera directamente la propuesta y explicación para un payload estructurado sin "
+        "consultar la base de datos. Útil para microservicios y auditorías externas."
+    ),
+)
+def create_proposal_direct(
+    payload: Stage6ProposalInput,
+    settings: Annotated[Settings, Depends(get_settings)],
+) -> Stage6ProposalOutput:
+    claude_explainer = ClaudeProposalExplainer(
+        api_key=settings.anthropic_api_key,
+        model=settings.anthropic_model,
+    )
+    service = ProposalService(claude_explainer=claude_explainer)
+    return service.generate_proposal(payload)
+
 
