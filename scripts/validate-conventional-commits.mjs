@@ -13,8 +13,14 @@ function validate(label, value) {
   return true;
 }
 
+function normalizePrTitle(value) {
+  const match = value?.match(/^([A-Za-z]+)\/\s*(\S.+)$/);
+  if (!match) return value;
+  return `${match[1].toLowerCase()}: ${match[2]}`;
+}
+
 let valid = true;
-if (title) valid = validate("PR title", title) && valid;
+if (title) valid = validate("PR title", normalizePrTitle(title)) && valid;
 
 const range = baseSha ? `${baseSha}..${headSha}` : headSha;
 const subjects = execFileSync("git", ["log", "--no-merges", "--format=%s", range], {
