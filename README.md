@@ -50,6 +50,13 @@ Endpoints iniciales:
 - `POST /api/invoices`: valida PDF, PNG y JPG de hasta 10 MB y acepta el archivo para procesamiento futuro.
 - `POST /api/invoices/{invoice_id}/matching`: ejecuta nuevamente la Etapa 3 y asocia la factura contra proveedores, órdenes de compra, contratos y soportes maestros.
 
+Endpoints del workspace consumidos por el Frontend estático:
+
+- `GET /api/workspace/cases`: lista expedientes con búsqueda y filtro de estado.
+- `GET /api/workspace/cases/{invoice_id}`: devuelve factura, documentos, matching, validaciones, propuesta y timeline.
+- `GET /api/workspace/cases/{invoice_id}/documents/{document_id}/content`: sirve el archivo documental real.
+- `POST /api/workspace/cases/{invoice_id}/actions`: registra correcciones, autorizaciones, soportes, aprobaciones y rechazos.
+
 Cuando la Etapa 2 obtiene datos de extracción, la carga de una factura también ejecuta automáticamente la Etapa 3. Las coincidencias exactas usan el NIT y el número de orden; RapidFuzz sólo se usa para nombres de proveedores y devuelve candidatos sin asociar cuando existe ambigüedad.
 
 ## Documentación de la API

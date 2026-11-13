@@ -44,7 +44,7 @@ class InvoiceTaxItem(BaseModel):
 class InvoiceEventItem(BaseModel):
     event_type: str
     actor_type: str
-    actor_name: str
+    actor_name: str | None = None
     from_status: str | None = None
     to_status: str | None = None
     rule_ref: str | None = None

@@ -209,7 +209,18 @@ def generate_proposal_from_db(
     validation_exceptions: list[ValidationExceptionItem] = []
 
     if validation_output:
+        cur.execute(
+            """
+            SELECT exception_type
+              FROM exceptions
+             WHERE invoice_id = %s AND resolution_status = 'OPEN'
+            """,
+            (invoice_id,),
+        )
+        open_exception_types = {row[0] for row in cur.fetchall()}
         for exc in validation_output.exceptions:
+            if exc.type not in open_exception_types:
+                continue
             validation_exceptions.append(
                 ValidationExceptionItem(
                     type=exc.type,

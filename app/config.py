@@ -13,7 +13,9 @@ class Settings(BaseSettings):
     database_url: str = (
         "postgresql://invoice:local-dev-password-change-me@db:5432/invoices"
     )
-    allowed_origins: str = "http://localhost:5173,http://localhost"
+    allowed_origins: str = (
+        "http://localhost:5173,http://localhost:8080,http://localhost"
+    )
     max_upload_size: int = 10 * 1024 * 1024
     anthropic_api_key: str = ""
     anthropic_model: str = "claude-sonnet-4-6"

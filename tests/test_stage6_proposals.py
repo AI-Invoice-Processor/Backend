@@ -187,11 +187,27 @@ def test_claude_service_fallback_on_api_error(exception_invoice_input):
 
     assert "FE-9001" in explanation.summary
     assert "DIFERENCIA_VS_OC" in explanation.summary
+    assert "Se detectó 1 inconsistencia técnica." in explanation.details
+    assert "valor esperado registrado para la primera excepción" in explanation.details
     assert (
         "nota crédito" in explanation.recommendation.lower()
         or "revisión" in explanation.recommendation.lower()
     )
     assert "contingency-rules" in metadata.model
+
+
+def test_claude_fallback_explains_missing_expected_value(exception_invoice_input):
+    exception_invoice_input.validation_exceptions[0].expected = None
+    exception_invoice_input.validation_exceptions.append(
+        exception_invoice_input.validation_exceptions[0].model_copy()
+    )
+    explainer = ClaudeProposalExplainer(api_key=None)
+
+    explanation, _ = explainer.explain_exceptions(exception_invoice_input)
+
+    assert "Se detectaron 2 inconsistencias técnicas." in explanation.details
+    assert "No se reportó un valor esperado" in explanation.details
+    assert "N/A COP" not in explanation.details
 
 
 # 5. Database operations: save proposal and event
