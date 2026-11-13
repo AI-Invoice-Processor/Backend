@@ -126,8 +126,8 @@ def evaluate_invoice_from_db(
         contract_id,
         po_id,
         confidence,
-        duplicate_of,
         issue_date,
+        duplicate_of,
     ) = (
         row[0],
         row[1],
