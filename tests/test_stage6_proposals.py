@@ -1,6 +1,5 @@
 """Unit and integration tests for Stage 6: Accounting Proposal & Explanation."""
 
-from decimal import Decimal
 from unittest.mock import MagicMock, patch
 from uuid import uuid4
 
@@ -10,13 +9,10 @@ from fastapi.testclient import TestClient
 from app.main import app
 from app.modules.proposals.claude_service import ClaudeProposalExplainer
 from app.modules.proposals.repository import (
-    generate_proposal_from_db,
-    get_accounting_catalogs,
     record_proposal_generated_event,
     save_accounting_proposal_to_db,
 )
 from app.modules.proposals.service import ProposalService
-from app.modules.proposals.template_service import generate_template_explanation
 from app.schemas.proposals import (
     AccountingContextInput,
     AmountsContextInput,
@@ -167,7 +163,9 @@ def test_exception_invoice_uses_claude(exception_invoice_input):
 
 
 # 3. Rule: Do not invent accounts; validate against authorized accounts
-def test_accounting_code_validation_rejects_unauthorized_account(exception_invoice_input):
+def test_accounting_code_validation_rejects_unauthorized_account(
+    exception_invoice_input,
+):
     exception_invoice_input.accounting_context.suggested_account = "9999_INVENTADA"
     mock_claude = MagicMock(spec=ClaudeProposalExplainer)
     mock_claude.explain_exceptions.return_value = (
@@ -189,7 +187,10 @@ def test_claude_service_fallback_on_api_error(exception_invoice_input):
 
     assert "FE-9001" in explanation.summary
     assert "DIFERENCIA_VS_OC" in explanation.summary
-    assert "nota crédito" in explanation.recommendation.lower() or "revisión" in explanation.recommendation.lower()
+    assert (
+        "nota crédito" in explanation.recommendation.lower()
+        or "revisión" in explanation.recommendation.lower()
+    )
     assert "contingency-rules" in metadata.model
 
 
@@ -277,7 +278,9 @@ def test_fastapi_proposal_endpoints(clean_invoice_input, exception_invoice_input
     client = TestClient(app)
 
     # Clean invoice -> TEMPLATE
-    res_clean = client.post("/api/invoices/proposals", json=clean_invoice_input.model_dump(mode="json"))
+    res_clean = client.post(
+        "/api/invoices/proposals", json=clean_invoice_input.model_dump(mode="json")
+    )
     assert res_clean.status_code == 200
     data_clean = res_clean.json()
     assert data_clean["schema_version"] == "0.2.0"
@@ -290,8 +293,13 @@ def test_fastapi_proposal_endpoints(clean_invoice_input, exception_invoice_input
         Explanation(summary="Sum", details="Det", recommendation="Rec"),
         ProposalMetadata(latency_ms=100.0),
     )
-    with patch("app.api.routers.invoices.ClaudeProposalExplainer", return_value=mock_explainer):
-        res_exc = client.post("/api/invoices/proposals", json=exception_invoice_input.model_dump(mode="json"))
+    with patch(
+        "app.api.routers.invoices.ClaudeProposalExplainer", return_value=mock_explainer
+    ):
+        res_exc = client.post(
+            "/api/invoices/proposals",
+            json=exception_invoice_input.model_dump(mode="json"),
+        )
         assert res_exc.status_code == 200
         data_exc = res_exc.json()
         assert data_exc["schema_version"] == "0.2.0"

@@ -5,10 +5,8 @@ from unittest.mock import MagicMock, patch
 from uuid import uuid4
 
 import pytest
-from typesafe_sdk import ChoiceAnswer, NoulAnswer, SystemOneResponse, Usage
 
 from app.modules.exceptions.adapter import (
-    JevAdapterError,
     JevConnectionError,
     JevExceptionAdapter,
     JevJudgmentResult,
@@ -91,7 +89,9 @@ def test_stage5_schema_contract_matching(sample_po_exception_input, mock_jev_ada
 
 
 # 2. Test guardrail: Never allow Jev to override mandatory failed validations
-def test_guardrail_mandatory_exceptions_cannot_be_overridden_by_jev(sample_po_exception_input):
+def test_guardrail_mandatory_exceptions_cannot_be_overridden_by_jev(
+    sample_po_exception_input,
+):
     # Even if Jev erroneously reports "low" risk with 1.0 confidence:
     lenient_adapter = MagicMock(spec=JevExceptionAdapter)
     lenient_adapter.evaluate_findings.return_value = JevJudgmentResult(
@@ -115,7 +115,10 @@ def test_guardrail_mandatory_exceptions_cannot_be_overridden_by_jev(sample_po_ex
     # Business rule in code ensures requires_human_review stays True!
     assert output.risk_assessment.requires_human_review is True
     assert output.decision == "REQUIERE_REVISION"
-    assert any("Excepciones obligatorias presentes" in r for r in output.audit_trace.guardrail_reasons)
+    assert any(
+        "Excepciones obligatorias presentes" in r
+        for r in output.audit_trace.guardrail_reasons
+    )
 
 
 # 3. Test uncertainty: low confidence, high ambiguity, or insufficient info triggers human review
@@ -157,13 +160,18 @@ def test_uncertainty_handling_triggers_human_review(
     assert output.risk_assessment.requires_human_review is True
     assert output.decision == "REQUIERE_REVISION"
     assert output.audit_trace.uncertainty_detected is True
-    assert any(expected_reason_keyword.lower() in r.lower() for r in output.audit_trace.uncertainty_reasons)
+    assert any(
+        expected_reason_keyword.lower() in r.lower()
+        for r in output.audit_trace.uncertainty_reasons
+    )
 
 
 # 4. Test fallback mechanism when Jev is unavailable (network, timeout, API down)
 def test_fallback_when_jev_is_unavailable(sample_po_exception_input):
     failing_adapter = MagicMock(spec=JevExceptionAdapter)
-    failing_adapter.evaluate_findings.side_effect = JevConnectionError("Connection timeout to api.typesafe.ai")
+    failing_adapter.evaluate_findings.side_effect = JevConnectionError(
+        "Connection timeout to api.typesafe.ai"
+    )
 
     service = ExceptionEvaluatorService(jev_adapter=failing_adapter)
     output = service.evaluate_exceptions(sample_po_exception_input)
@@ -256,13 +264,28 @@ def test_evaluate_invoice_from_db_mocked(mock_jev_adapter):
 
     # SELECT invoice and document row
     cur.fetchone.side_effect = [
-        (doc_id, "EXCEPCION", uuid4(), uuid4(), uuid4(), Decimal("0.98"), None, None),  # invoice row
+        (
+            doc_id,
+            "EXCEPCION",
+            uuid4(),
+            uuid4(),
+            uuid4(),
+            Decimal("0.98"),
+            None,
+            None,
+        ),  # invoice row
         None,  # get_current_validation_from_db
         (uuid4(),),  # contract dates
         (1,),  # support documents count
     ]
     cur.fetchall.return_value = [
-        ("DIFERENCIA_VS_OC", "high", "Diferencia de monto", Decimal("2000000"), Decimal("4.0")),
+        (
+            "DIFERENCIA_VS_OC",
+            "high",
+            "Diferencia de monto",
+            Decimal(2000000),
+            Decimal("4.0"),
+        ),
     ]
 
     service = ExceptionEvaluatorService(jev_adapter=mock_jev_adapter)
@@ -274,11 +297,16 @@ def test_evaluate_invoice_from_db_mocked(mock_jev_adapter):
 
 
 # 8. Test FastAPI endpoint via TestClient
-def test_fastapi_evaluate_exceptions_endpoint(mock_jev_adapter, sample_po_exception_input):
+def test_fastapi_evaluate_exceptions_endpoint(
+    mock_jev_adapter, sample_po_exception_input
+):
     from fastapi.testclient import TestClient
+
     from app.main import app
 
-    with patch("app.api.routers.invoices.JevExceptionAdapter", return_value=mock_jev_adapter):
+    with patch(
+        "app.api.routers.invoices.JevExceptionAdapter", return_value=mock_jev_adapter
+    ):
         client = TestClient(app)
         payload = sample_po_exception_input.model_dump(mode="json")
         response = client.post("/api/invoices/evaluate-exceptions", json=payload)
@@ -291,4 +319,3 @@ def test_fastapi_evaluate_exceptions_endpoint(mock_jev_adapter, sample_po_except
         assert data["risk_assessment"]["exception_category"] == "amount_mismatch"
         assert data["risk_assessment"]["requires_human_review"] is True
         assert data["decision"] == "REQUIERE_REVISION"
-

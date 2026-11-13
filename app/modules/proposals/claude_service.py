@@ -27,11 +27,17 @@ class ClaudeProposalExplainer:
         self.api_key = api_key
         self.model = model
 
-    def explain_exceptions(self, input_data: Stage6ProposalInput) -> tuple[Explanation, ProposalMetadata]:
+    def explain_exceptions(
+        self, input_data: Stage6ProposalInput
+    ) -> tuple[Explanation, ProposalMetadata]:
         """Generate structured explanation using Claude API or graceful fallback if unreachable."""
         if not self.api_key:
-            logger.warning("ANTHROPIC_API_KEY no configurada. Usando generador contextual determinista de contingencia.")
-            return self._fallback_explanation(input_data, reason="Sin API Key configurada")
+            logger.warning(
+                "ANTHROPIC_API_KEY no configurada. Usando generador contextual determinista de contingencia."
+            )
+            return self._fallback_explanation(
+                input_data, reason="Sin API Key configurada"
+            )
 
         doc_refs = input_data.document_references
         inv_num = doc_refs.get("number") or str(input_data.invoice_id)[:8]
@@ -42,7 +48,9 @@ class ClaudeProposalExplainer:
             invoice_ref=full_invoice_num,
             supplier_name=input_data.supplier.name,
             amounts=input_data.amounts.model_dump(),
-            validation_exceptions=[e.model_dump() for e in input_data.validation_exceptions],
+            validation_exceptions=[
+                e.model_dump() for e in input_data.validation_exceptions
+            ],
             risk_assessment=input_data.risk_assessment.model_dump(),
             document_references=doc_refs,
         )
@@ -58,27 +66,44 @@ class ClaudeProposalExplainer:
                 tool_choice={"type": "tool", "name": "generate_accounting_explanation"},
                 messages=[{"role": "user", "content": user_prompt}],
             )
-        except Exception as exc:
-            logger.warning("Error invocando Claude API para explicación contable: %s", exc)
-            return self._fallback_explanation(input_data, reason=f"Fallo en Claude API: {exc}")
+        except anthropic.AnthropicError as exc:
+            logger.warning(
+                "Error invocando Claude API para explicación contable: %s", exc
+            )
+            return self._fallback_explanation(
+                input_data, reason=f"Fallo en Claude API: {exc}"
+            )
 
         elapsed_ms = (time.perf_counter() - start_time) * 1000.0
 
         # Extract structured tool output
         explanation_data: dict[str, Any] | None = None
         for block in message.content:
-            if block.type == "tool_use" and block.name == "generate_accounting_explanation":
+            if (
+                block.type == "tool_use"
+                and block.name == "generate_accounting_explanation"
+            ):
                 explanation_data = block.input
                 break
 
         if not explanation_data:
-            logger.warning("Claude no devolvió bloque tool_use esperado. Activando fallback.")
-            return self._fallback_explanation(input_data, reason="Claude response missing tool_use block")
+            logger.warning(
+                "Claude no devolvió bloque tool_use esperado. Activando fallback."
+            )
+            return self._fallback_explanation(
+                input_data, reason="Claude response missing tool_use block"
+            )
 
         explanation = Explanation(
-            summary=explanation_data.get("summary", "Excepción detectada en validación financiera."),
-            details=explanation_data.get("details", "Discrepancia entre documentos de respaldo."),
-            recommendation=explanation_data.get("recommendation", "Revisar soporte antes de causar."),
+            summary=explanation_data.get(
+                "summary", "Excepción detectada en validación financiera."
+            ),
+            details=explanation_data.get(
+                "details", "Discrepancia entre documentos de respaldo."
+            ),
+            recommendation=explanation_data.get(
+                "recommendation", "Revisar soporte antes de causar."
+            ),
         )
 
         metadata = ProposalMetadata(
@@ -91,7 +116,9 @@ class ClaudeProposalExplainer:
 
         return explanation, metadata
 
-    def _fallback_explanation(self, input_data: Stage6ProposalInput, reason: str) -> tuple[Explanation, ProposalMetadata]:
+    def _fallback_explanation(
+        self, input_data: Stage6ProposalInput, reason: str
+    ) -> tuple[Explanation, ProposalMetadata]:
         """Contingency explanation when Claude cannot be reached."""
         start_time = time.perf_counter()
         exceptions = input_data.validation_exceptions
@@ -122,7 +149,9 @@ class ClaudeProposalExplainer:
 
         elapsed_ms = (time.perf_counter() - start_time) * 1000.0
 
-        explanation = Explanation(summary=summary, details=details, recommendation=recommendation)
+        explanation = Explanation(
+            summary=summary, details=details, recommendation=recommendation
+        )
         metadata = ProposalMetadata(
             latency_ms=round(elapsed_ms, 2),
             input_tokens=0,

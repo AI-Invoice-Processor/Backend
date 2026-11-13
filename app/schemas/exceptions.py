@@ -1,6 +1,6 @@
 """Stage 5 schemas: Intelligent exception evaluation with Jev TypeSafe AI."""
 
-from typing import Any, Literal
+from typing import Literal
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field

@@ -12,7 +12,11 @@ def generate_template_explanation(input_data: Stage6ProposalInput) -> Explanatio
     prefix = doc_refs.get("prefix") or ""
     full_invoice_num = f"{prefix}-{inv_num}".strip("-")
 
-    po_num = doc_refs.get("order_number") or doc_refs.get("po_reference") or "orden de compra asociada"
+    po_num = (
+        doc_refs.get("order_number")
+        or doc_refs.get("po_reference")
+        or "orden de compra asociada"
+    )
     contract_num = doc_refs.get("contract_number") or "contrato marco vigente"
     acct = input_data.accounting_context.suggested_account or "5135"
     cc = input_data.accounting_context.cost_center or "CC01"

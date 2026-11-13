@@ -11,9 +11,6 @@ Adheres strictly to the TypeSafe craft principles:
 import json
 import logging
 import time
-from decimal import Decimal
-from typing import Any
-from uuid import UUID
 
 from app.modules.exceptions.adapter import (
     JevAdapterError,
@@ -29,9 +26,6 @@ from app.modules.exceptions.questions import (
 from app.schemas.exceptions import (
     AuditTrace,
     DecisionType,
-    EvaluationContextInput,
-    ExceptionCategory,
-    ExceptionFindingInput,
     RiskAssessment,
     RiskLevel,
     Stage5EvaluationInput,
@@ -98,9 +92,17 @@ class RuleBasedFallbackEvaluator:
                 except (ValueError, TypeError):
                     diff_pct_val = 0.0
 
-            if "OC" in exc_type or "ORDEN" in exc_type or "PRECIO" in exc_type or "D2" in exc_type:
+            if (
+                "OC" in exc_type
+                or "ORDEN" in exc_type
+                or "PRECIO" in exc_type
+                or "D2" in exc_type
+            ):
                 category = "amount_mismatch"
-                if diff_pct_val > 5.0 or (first_exc.severity and first_exc.severity.lower() in ("high", "critical")):
+                if diff_pct_val > 5.0 or (
+                    first_exc.severity
+                    and first_exc.severity.lower() in ("high", "critical")
+                ):
                     risk_level = "high"
                     score = min(0.75 + (diff_pct_val / 100.0), 0.98)
                 elif diff_pct_val > 0.0:
@@ -109,7 +111,12 @@ class RuleBasedFallbackEvaluator:
                 else:
                     risk_level = "low"
                     score = 0.20
-            elif "IVA" in exc_type or "IMPUESTO" in exc_type or "RETENCION" in exc_type or "V4" in exc_type:
+            elif (
+                "IVA" in exc_type
+                or "IMPUESTO" in exc_type
+                or "RETENCION" in exc_type
+                or "V4" in exc_type
+            ):
                 category = "tax_mismatch"
                 risk_level = "high"
                 score = 0.82
@@ -130,8 +137,14 @@ class RuleBasedFallbackEvaluator:
 
         elapsed_ms = (time.perf_counter() - start_time) * 1000.0
 
-        requires_review = bool(exceptions or risk_level in ("medium", "high", "critical") or not ctx.support_complete)
-        decision: DecisionType = "REQUIERE_REVISION" if requires_review else "APROBADO_DIRECTO"
+        requires_review = bool(
+            exceptions
+            or risk_level in ("medium", "high", "critical")
+            or not ctx.support_complete
+        )
+        decision: DecisionType = (
+            "REQUIERE_REVISION" if requires_review else "APROBADO_DIRECTO"
+        )
 
         trace = AuditTrace(
             evaluator="fallback_rules",
@@ -173,8 +186,8 @@ class ClaudeExceptionEvaluator:
 
         prompt = f"""You are a financial invoice compliance assistant.
 Analyze these computed exceptions and context (never raw documents):
-Findings: {json.dumps([e.model_dump(mode='json') for e in data.exceptions])}
-Context: {json.dumps(data.context.model_dump(mode='json'))}
+Findings: {json.dumps([e.model_dump(mode="json") for e in data.exceptions])}
+Context: {json.dumps(data.context.model_dump(mode="json"))}
 
 Classify into:
 1. exception_category: one of [amount_mismatch, tax_mismatch, supplier_mismatch, duplicate_invoice, missing_support, contract_expired, purchase_order_missing, incomplete_information, other]
@@ -209,7 +222,9 @@ Respond strictly with valid JSON only, without any markdown formatting or commen
         if data.exceptions or data.context.duplicate_detected:
             req_review = True
 
-        decision: DecisionType = "REQUIERE_REVISION" if req_review else "APROBADO_DIRECTO"
+        decision: DecisionType = (
+            "REQUIERE_REVISION" if req_review else "APROBADO_DIRECTO"
+        )
 
         trace = AuditTrace(
             evaluator="claude",
@@ -245,7 +260,9 @@ class ExceptionEvaluatorService:
         self.jev_adapter = jev_adapter or JevExceptionAdapter()
         self.fallback_evaluator = fallback_evaluator or RuleBasedFallbackEvaluator()
 
-    def evaluate_exceptions(self, input_data: Stage5EvaluationInput) -> Stage5EvaluationOutput:
+    def evaluate_exceptions(
+        self, input_data: Stage5EvaluationInput
+    ) -> Stage5EvaluationOutput:
         """Evaluate invoice exceptions using Jev TypeSafe AI with code decision guardrails."""
         # Convert findings and context into clean python dictionaries (never raw files)
         findings_payload = [e.model_dump(mode="json") for e in input_data.exceptions]
@@ -356,7 +373,9 @@ class ExceptionEvaluatorService:
         if has_context_failures:
             requires_review = True
             if data.context.duplicate_detected:
-                guardrail_reasons.append("Factura duplicada detectada: revisión obligatoria")
+                guardrail_reasons.append(
+                    "Factura duplicada detectada: revisión obligatoria"
+                )
             if not data.context.supplier_matched:
                 guardrail_reasons.append("Proveedor no coincide con registros maestros")
             if not data.context.contract_active:
@@ -369,14 +388,21 @@ class ExceptionEvaluatorService:
         # 2. Si Jev devuelve una respuesta incierta, recomendar revisión humana.
         if is_uncertain:
             requires_review = True
-            guardrail_reasons.append("Incertidumbre detectada en juicio Jev: revisión humana requerida")
+            guardrail_reasons.append(
+                "Incertidumbre detectada en juicio Jev: revisión humana requerida"
+            )
 
         # 3. Categorías de riesgo elevadas requieren revisión.
         if risk_level in ("medium", "high", "critical") or risk_score >= 0.40:
             requires_review = True
 
         # If perfectly clean and certain:
-        if not requires_review and not has_mandatory_exceptions and not has_context_failures and not is_uncertain:
+        if (
+            not requires_review
+            and not has_mandatory_exceptions
+            and not has_context_failures
+            and not is_uncertain
+        ):
             category = "other"
             risk_level = "low"
             risk_score = min(risk_score, 0.10)

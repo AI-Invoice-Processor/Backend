@@ -12,7 +12,6 @@ from typing import Any
 from typesafe_sdk import (
     ChoiceAnswer,
     NoulAnswer,
-    ScoreAnswer,
     TypeSafeAPIConnectionError,
     TypeSafeAPIError,
     TypeSafeAPITimeoutError,
@@ -114,12 +113,14 @@ class JevExceptionAdapter:
             raise JevConnectionError(f"No se pudo conectar con Jev: {exc}") from exc
         except TypeSafeAuthenticationError as exc:
             logger.error("Error de autenticación con Jev API: %s", exc)
-            raise JevAuthenticationError(f"Autenticación fallida con Jev: {exc}") from exc
+            raise JevAuthenticationError(
+                f"Autenticación fallida con Jev: {exc}"
+            ) from exc
         except (TypeSafeRateLimitError, TypeSafeAPIError, TypeSafeError) as exc:
             logger.warning("Error retornado por la API de TypeSafe Jev: %s", exc)
             raise JevAdapterError(f"Error en TypeSafe Jev: {exc}") from exc
         except Exception as exc:
-            logger.exception("Error inesperado al invocar Jev TypeSafe: %s", exc)
+            logger.exception("Error inesperado al invocar Jev TypeSafe")
             raise JevAdapterError(f"Error inesperado en adaptador Jev: {exc}") from exc
 
         elapsed_ms = (time.perf_counter() - start_time) * 1000.0
@@ -129,13 +130,25 @@ class JevExceptionAdapter:
 
         cat_ans = answers.get("category")
         category = cat_ans.choice if isinstance(cat_ans, ChoiceAnswer) else "other"
-        cat_conf = float(cat_ans.confidence) if isinstance(cat_ans, ChoiceAnswer) else 0.5
-        cat_probs = {k: float(v) for k, v in cat_ans.probabilities.items()} if isinstance(cat_ans, ChoiceAnswer) else {}
+        cat_conf = (
+            float(cat_ans.confidence) if isinstance(cat_ans, ChoiceAnswer) else 0.5
+        )
+        cat_probs = (
+            {k: float(v) for k, v in cat_ans.probabilities.items()}
+            if isinstance(cat_ans, ChoiceAnswer)
+            else {}
+        )
 
         risk_ans = answers.get("risk_level")
         risk_level = risk_ans.choice if isinstance(risk_ans, ChoiceAnswer) else "high"
-        risk_conf = float(risk_ans.confidence) if isinstance(risk_ans, ChoiceAnswer) else 0.5
-        risk_probs = {k: float(v) for k, v in risk_ans.probabilities.items()} if isinstance(risk_ans, ChoiceAnswer) else {}
+        risk_conf = (
+            float(risk_ans.confidence) if isinstance(risk_ans, ChoiceAnswer) else 0.5
+        )
+        risk_probs = (
+            {k: float(v) for k, v in risk_ans.probabilities.items()}
+            if isinstance(risk_ans, ChoiceAnswer)
+            else {}
+        )
 
         suff_ans = answers.get("information_sufficiency")
         suff_prob = float(suff_ans.noul) if isinstance(suff_ans, NoulAnswer) else 0.5

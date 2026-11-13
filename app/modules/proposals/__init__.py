@@ -11,11 +11,11 @@ from app.modules.proposals.service import ProposalService
 from app.modules.proposals.template_service import generate_template_explanation
 
 __all__ = [
-    "ProposalService",
     "ClaudeProposalExplainer",
-    "generate_template_explanation",
+    "InvoiceNotFoundError",
+    "ProposalService",
     "generate_proposal_from_db",
+    "generate_template_explanation",
     "get_accounting_proposal_from_db",
     "save_accounting_proposal_to_db",
-    "InvoiceNotFoundError",
 ]

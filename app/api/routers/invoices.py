@@ -20,9 +20,11 @@ import app.main as main_module
 from app.api.dependencies import Settings, get_db, get_settings
 from app.modules.exceptions import (
     ExceptionEvaluatorService,
-    InvoiceNotFoundError as ExceptionInvoiceNotFoundError,
     JevExceptionAdapter,
     evaluate_invoice_from_db,
+)
+from app.modules.exceptions import (
+    InvoiceNotFoundError as ExceptionInvoiceNotFoundError,
 )
 from app.modules.invoices import (
     get_invoice_business_and_duplicate_status,
@@ -33,10 +35,12 @@ from app.modules.invoices import (
 from app.modules.matching import InvoiceNotFoundError, match_invoice_from_db
 from app.modules.proposals import (
     ClaudeProposalExplainer,
-    InvoiceNotFoundError as ProposalInvoiceNotFoundError,
     ProposalService,
     generate_proposal_from_db,
     get_accounting_proposal_from_db,
+)
+from app.modules.proposals import (
+    InvoiceNotFoundError as ProposalInvoiceNotFoundError,
 )
 from app.modules.validation.repository import (
     InvoiceNotFoundError as ValidationInvoiceNotFoundError,
@@ -47,8 +51,8 @@ from app.modules.validation.repository import (
 )
 from app.schemas.exceptions import Stage5EvaluationInput, Stage5EvaluationOutput
 from app.schemas.invoice import InvoiceDetail, InvoiceListItem, UploadInvoiceResponse
-from app.schemas.proposals import Stage6ProposalInput, Stage6ProposalOutput
 from app.schemas.matching import InvoiceMatchingResponse
+from app.schemas.proposals import Stage6ProposalInput, Stage6ProposalOutput
 from app.schemas.validation import ValidationOutput
 
 router = APIRouter(prefix="/api/invoices", tags=["invoices"])
@@ -282,7 +286,8 @@ def evaluate_invoice_exceptions(
         raise HTTPException(status_code=404, detail="Factura no encontrada") from exc
     except psycopg.Error as exc:
         raise HTTPException(
-            status_code=503, detail="Error de base de datos durante la evaluación de excepciones"
+            status_code=503,
+            detail="Error de base de datos durante la evaluación de excepciones",
         ) from exc
 
 
@@ -334,7 +339,8 @@ def create_invoice_proposal(
         raise HTTPException(status_code=404, detail="Factura no encontrada") from exc
     except psycopg.Error as exc:
         raise HTTPException(
-            status_code=503, detail="Error de base de datos al generar la propuesta contable"
+            status_code=503,
+            detail="Error de base de datos al generar la propuesta contable",
         ) from exc
 
 
@@ -376,5 +382,3 @@ def create_proposal_direct(
     )
     service = ProposalService(claude_explainer=claude_explainer)
     return service.generate_proposal(payload)
-
-

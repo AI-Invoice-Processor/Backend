@@ -218,7 +218,7 @@ def run_benchmark():
         r_val = results.get("rules", {}).get(key, "N/A")
         j_val = results.get("jev", {}).get(key, "N/A")
         c_val = results.get("claude", {}).get(key, "N/A")
-        print(f"{label:<30} | {str(r_val):<16} | {str(j_val):<16} | {str(c_val):<16}")
+        print(f"{label:<30} | {r_val!s:<16} | {j_val!s:<16} | {c_val!s:<16}")
     print("=" * 80 + "\n")
     return results
 

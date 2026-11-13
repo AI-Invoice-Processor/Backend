@@ -1,13 +1,11 @@
 """Domain orchestrator service for Stage 6: Accounting Proposal & Explanation."""
 
 import logging
-from uuid import UUID
 
 from app.modules.proposals.claude_service import ClaudeProposalExplainer
 from app.modules.proposals.template_service import generate_template_explanation
 from app.schemas.proposals import (
     AccountingProposalData,
-    Explanation,
     ProposalMetadata,
     ProposalStatus,
     Stage6ProposalInput,
@@ -27,7 +25,9 @@ class ProposalService:
     def __init__(self, claude_explainer: ClaudeProposalExplainer | None = None):
         self.claude_explainer = claude_explainer or ClaudeProposalExplainer()
 
-    def generate_proposal(self, input_data: Stage6ProposalInput) -> Stage6ProposalOutput:
+    def generate_proposal(
+        self, input_data: Stage6ProposalInput
+    ) -> Stage6ProposalOutput:
         """Generate structured accounting proposal and explanation adhering to rules."""
         has_exceptions = bool(input_data.validation_exceptions)
         requires_review = input_data.risk_assessment.requires_human_review
@@ -75,7 +75,9 @@ class ProposalService:
             metadata=metadata,
         )
 
-    def _validate_accounting_codes(self, acct_ctx) -> tuple[str | None, str | None, str]:
+    def _validate_accounting_codes(
+        self, acct_ctx
+    ) -> tuple[str | None, str | None, str]:
         """Validate suggested account and cost center against authorized master lists."""
         suggested_account = acct_ctx.suggested_account
         suggested_cc = acct_ctx.cost_center
@@ -95,7 +97,9 @@ class ProposalService:
         if not suggested_account or not suggested_cc or not acct_valid or not cc_valid:
             status = "PENDING_VALIDATION"
 
-        final_acct = suggested_account if (acct_valid or not authorized_accounts) else None
+        final_acct = (
+            suggested_account if (acct_valid or not authorized_accounts) else None
+        )
         final_cc = suggested_cc if (cc_valid or not authorized_ccs) else None
 
         return final_acct, final_cc, status

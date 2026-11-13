@@ -2,10 +2,8 @@
 
 import json
 from decimal import Decimal
-from typing import Any
 from uuid import UUID
 
-from app.modules.exceptions.adapter import JevExceptionAdapter
 from app.modules.exceptions.evaluator import ExceptionEvaluatorService
 from app.modules.validation.repository import get_current_validation_from_db
 from app.schemas.exceptions import (
@@ -38,7 +36,12 @@ def update_invoice_risk_fields(
                updated_at = now()
          WHERE id = %s
         """,
-        (risk_level, Decimal(str(risk_score)), Decimal(str(risk_confidence)), invoice_id),
+        (
+            risk_level,
+            Decimal(str(risk_score)),
+            Decimal(str(risk_confidence)),
+            invoice_id,
+        ),
     )
 
 
@@ -139,8 +142,12 @@ def evaluate_invoice_from_db(
             exceptions_input.append(
                 ExceptionFindingInput(
                     type=exc.type,
-                    difference=str(exc.difference) if exc.difference is not None else None,
-                    difference_percentage=str(exc.difference_pct) if exc.difference_pct is not None else None,
+                    difference=str(exc.difference)
+                    if exc.difference is not None
+                    else None,
+                    difference_percentage=str(exc.difference_pct)
+                    if exc.difference_pct is not None
+                    else None,
                     severity=exc.severity,
                     description=exc.description,
                 )

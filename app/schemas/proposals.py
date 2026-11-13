@@ -19,7 +19,9 @@ GeneratedBy = Literal["TEMPLATE", "CLAUDE"]
 class SupplierContextInput(BaseModel):
     model_config = ConfigDict(extra="allow")
 
-    supplier_id: UUID | None = Field(default=None, description="UUID del proveedor si fue asociado")
+    supplier_id: UUID | None = Field(
+        default=None, description="UUID del proveedor si fue asociado"
+    )
     name: str | None = Field(default=None, description="Razón social del proveedor")
     nit: str | None = Field(default=None, description="NIT o identificación fiscal")
 
@@ -36,23 +38,44 @@ class AmountsContextInput(BaseModel):
 class ValidationExceptionItem(BaseModel):
     model_config = ConfigDict(extra="allow")
 
-    type: str = Field(..., description="Tipo de excepción o regla (ej. DIFERENCIA_VS_OC, IVA_DISCREPANCIA)")
-    expected: str | None = Field(default=None, description="Valor o texto esperado por la regla")
-    actual: str | None = Field(default=None, description="Valor o texto real de la factura")
+    type: str = Field(
+        ...,
+        description="Tipo de excepción o regla (ej. DIFERENCIA_VS_OC, IVA_DISCREPANCIA)",
+    )
+    expected: str | None = Field(
+        default=None, description="Valor o texto esperado por la regla"
+    )
+    actual: str | None = Field(
+        default=None, description="Valor o texto real de la factura"
+    )
     difference: str | None = Field(default=None, description="Diferencia cuantificada")
-    difference_percentage: str | None = Field(default=None, description="Porcentaje de diferencia")
+    difference_percentage: str | None = Field(
+        default=None, description="Porcentaje de diferencia"
+    )
     severity: str | None = Field(default=None, description="Severidad de la excepción")
-    description: str | None = Field(default=None, description="Descripción del hallazgo")
+    description: str | None = Field(
+        default=None, description="Descripción del hallazgo"
+    )
 
 
 class RiskAssessmentContextInput(BaseModel):
     model_config = ConfigDict(extra="allow")
 
-    risk_level: str = Field(default="low", description="Nivel de riesgo (low, medium, high, critical)")
-    requires_human_review: bool = Field(default=False, description="Requiere revisión humana")
-    risk_score: float | None = Field(default=None, description="Puntuación cuantitativa de riesgo")
-    exception_category: str | None = Field(default=None, description="Categoría clasificada de la excepción")
-    confidence: float | None = Field(default=None, description="Confianza de la evaluación")
+    risk_level: str = Field(
+        default="low", description="Nivel de riesgo (low, medium, high, critical)"
+    )
+    requires_human_review: bool = Field(
+        default=False, description="Requiere revisión humana"
+    )
+    risk_score: float | None = Field(
+        default=None, description="Puntuación cuantitativa de riesgo"
+    )
+    exception_category: str | None = Field(
+        default=None, description="Categoría clasificada de la excepción"
+    )
+    confidence: float | None = Field(
+        default=None, description="Confianza de la evaluación"
+    )
 
 
 class AccountingContextInput(BaseModel):
@@ -81,7 +104,9 @@ class Stage6ProposalInput(BaseModel):
     model_config = ConfigDict(extra="ignore")
 
     invoice_id: UUID = Field(..., description="Identificador único de la factura")
-    data_version: int = Field(default=1, ge=1, description="Versión de datos de la factura")
+    data_version: int = Field(
+        default=1, ge=1, description="Versión de datos de la factura"
+    )
     supplier: SupplierContextInput = Field(default_factory=SupplierContextInput)
     amounts: AmountsContextInput
     validation_exceptions: list[ValidationExceptionItem] = Field(
@@ -105,19 +130,33 @@ class Stage6ProposalInput(BaseModel):
 class Explanation(BaseModel):
     model_config = ConfigDict(extra="ignore")
 
-    summary: str = Field(..., description="Resumen conciso y claro de la situación contable")
-    details: str = Field(..., description="Detalle técnico de documentos contrastados y discrepancias")
-    recommendation: str = Field(..., description="Recomendación accionable para el área financiera")
+    summary: str = Field(
+        ..., description="Resumen conciso y claro de la situación contable"
+    )
+    details: str = Field(
+        ..., description="Detalle técnico de documentos contrastados y discrepancias"
+    )
+    recommendation: str = Field(
+        ..., description="Recomendación accionable para el área financiera"
+    )
 
 
 class AccountingProposalData(BaseModel):
     model_config = ConfigDict(extra="ignore")
 
-    supplier_id: UUID | None = Field(default=None, description="Identificador del proveedor")
-    account_code: str | None = Field(..., description="Código PUC de cuenta contable autorizado")
-    cost_center_code: str | None = Field(..., description="Código de centro de costo autorizado")
+    supplier_id: UUID | None = Field(
+        default=None, description="Identificador del proveedor"
+    )
+    account_code: str | None = Field(
+        ..., description="Código PUC de cuenta contable autorizado"
+    )
+    cost_center_code: str | None = Field(
+        ..., description="Código de centro de costo autorizado"
+    )
     subtotal: str = Field(..., description="Subtotal a causar en string decimal")
-    tax_total: str = Field(..., description="Total de impuestos a causar en string decimal")
+    tax_total: str = Field(
+        ..., description="Total de impuestos a causar en string decimal"
+    )
     total: str = Field(..., description="Total de la causación en string decimal")
     status: ProposalStatus = Field(
         ...,

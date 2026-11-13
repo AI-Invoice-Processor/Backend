@@ -2,7 +2,6 @@
 
 import json
 from decimal import Decimal
-from typing import Any
 from uuid import UUID
 
 from app.modules.proposals.service import ProposalService
@@ -109,7 +108,9 @@ def record_proposal_generated_event(
 ) -> None:
     """Persist an audit trail event in invoice_events."""
     payload = output.model_dump(mode="json")
-    actor_name = "Claude Sonnet" if output.generated_by == "CLAUDE" else "Template Engine"
+    actor_name = (
+        "Claude Sonnet" if output.generated_by == "CLAUDE" else "Template Engine"
+    )
     actor_type = "ai" if output.generated_by == "CLAUDE" else "system"
 
     cur.execute(
@@ -175,11 +176,11 @@ def generate_proposal_from_db(
         data_version,
         business_status,
         supplier_id,
-        contract_id,
+        _contract_id,
         po_id,
         subtotal,
         total,
-        retentions_total,
+        _retentions_total,
         currency,
         prefix,
         number,
@@ -193,9 +194,9 @@ def generate_proposal_from_db(
         default_account,
         default_cost_center,
         po_number,
-        po_subtotal,
-        po_tax,
-        po_total,
+        _po_subtotal,
+        _po_tax,
+        _po_total,
     ) = row
 
     # Calculate tax_total (total - subtotal)
@@ -212,10 +213,18 @@ def generate_proposal_from_db(
             validation_exceptions.append(
                 ValidationExceptionItem(
                     type=exc.type,
-                    expected=str(exc.expected_amount) if exc.expected_amount is not None else None,
-                    actual=str(exc.actual_amount) if exc.actual_amount is not None else None,
-                    difference=str(exc.difference) if exc.difference is not None else None,
-                    difference_percentage=str(exc.difference_pct) if exc.difference_pct is not None else None,
+                    expected=str(exc.expected_amount)
+                    if exc.expected_amount is not None
+                    else None,
+                    actual=str(exc.actual_amount)
+                    if exc.actual_amount is not None
+                    else None,
+                    difference=str(exc.difference)
+                    if exc.difference is not None
+                    else None,
+                    difference_percentage=str(exc.difference_pct)
+                    if exc.difference_pct is not None
+                    else None,
                     severity=exc.severity,
                     description=exc.description,
                 )
@@ -255,7 +264,9 @@ def generate_proposal_from_db(
             "SELECT number, support_type, received_amount FROM support_documents WHERE purchase_order_id = %s",
             (po_id,),
         )
-        support_docs = [{"number": r[0], "type": r[1], "amount": str(r[2])} for r in cur.fetchall()]
+        support_docs = [
+            {"number": r[0], "type": r[1], "amount": str(r[2])} for r in cur.fetchall()
+        ]
 
     doc_references = {
         "invoice_number": f"{prefix or ''}-{number or ''}".strip("-"),
@@ -280,7 +291,9 @@ def generate_proposal_from_db(
         supplier=SupplierContextInput(
             supplier_id=supplier_id,
             name=supplier_name,
-            nit=f"{supplier_nit}-{supplier_dv}" if (supplier_nit and supplier_dv) else supplier_nit,
+            nit=f"{supplier_nit}-{supplier_dv}"
+            if (supplier_nit and supplier_dv)
+            else supplier_nit,
         ),
         amounts=AmountsContextInput(
             subtotal=str(subtotal_dec),
@@ -317,7 +330,10 @@ def generate_proposal_from_db(
 
     # 7. State transition if valid
     current_status = InvoiceStatus(business_status)
-    if output.accounting_proposal.status == "READY_FOR_APPROVAL" and current_status == InvoiceStatus.VALIDADA:
+    if (
+        output.accounting_proposal.status == "READY_FOR_APPROVAL"
+        and current_status == InvoiceStatus.VALIDADA
+    ):
         transition_invoice_status(
             cur,
             invoice_id=invoice_id,
@@ -340,7 +356,9 @@ def generate_proposal_from_db(
     return output
 
 
-def get_accounting_proposal_from_db(cur, invoice_id: UUID) -> Stage6ProposalOutput | None:
+def get_accounting_proposal_from_db(
+    cur, invoice_id: UUID
+) -> Stage6ProposalOutput | None:
     """Retrieve the latest accounting proposal for an invoice."""
     cur.execute(
         """
