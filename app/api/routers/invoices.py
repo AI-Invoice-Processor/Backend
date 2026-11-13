@@ -1,6 +1,8 @@
 import hashlib
+from datetime import date, datetime
 from typing import Annotated, Any
 from uuid import UUID, uuid4
+from zoneinfo import ZoneInfo
 
 import psycopg
 from fastapi import (
@@ -12,9 +14,18 @@ from fastapi import (
     UploadFile,
     status,
 )
+from pydantic import ValidationError
 
 import app.main as main_module
 from app.api.dependencies import Settings, get_db, get_settings
+from app.modules.exceptions import (
+    ExceptionEvaluatorService,
+    JevExceptionAdapter,
+    evaluate_invoice_from_db,
+)
+from app.modules.exceptions import (
+    InvoiceNotFoundError as ExceptionInvoiceNotFoundError,
+)
 from app.modules.invoices import (
     get_invoice_business_and_duplicate_status,
     get_invoice_detail_from_db,
@@ -22,8 +33,27 @@ from app.modules.invoices import (
     record_initial_invoice,
 )
 from app.modules.matching import InvoiceNotFoundError, match_invoice_from_db
+from app.modules.proposals import (
+    ClaudeProposalExplainer,
+    ProposalService,
+    generate_proposal_from_db,
+    get_accounting_proposal_from_db,
+)
+from app.modules.proposals import (
+    InvoiceNotFoundError as ProposalInvoiceNotFoundError,
+)
+from app.modules.validation.repository import (
+    InvoiceNotFoundError as ValidationInvoiceNotFoundError,
+)
+from app.modules.validation.repository import (
+    ValidationConflictError,
+    validate_invoice_from_db,
+)
+from app.schemas.exceptions import Stage5EvaluationInput, Stage5EvaluationOutput
 from app.schemas.invoice import InvoiceDetail, InvoiceListItem, UploadInvoiceResponse
 from app.schemas.matching import InvoiceMatchingResponse
+from app.schemas.proposals import Stage6ProposalInput, Stage6ProposalOutput
+from app.schemas.validation import ValidationOutput
 
 router = APIRouter(prefix="/api/invoices", tags=["invoices"])
 
@@ -185,3 +215,170 @@ def upload_invoice(
         "extraction": extraction.model_dump(mode="json"),
         "matching": matching.model_dump(mode="json") if matching else None,
     }
+
+
+@router.post(
+    "/{invoice_id}/validation",
+    response_model=ValidationOutput,
+    summary="Ejecutar validación financiera determinista (Etapa 4)",
+)
+def validate_invoice(
+    invoice_id: UUID,
+    conn: Annotated[psycopg.Connection, Depends(get_db)],
+    settings: Annotated[Settings, Depends(get_settings)],
+    reference_date: date | None = None,
+) -> ValidationOutput:
+    if reference_date is not None and settings.environment.lower() not in {
+        "development",
+        "test",
+        "testing",
+    }:
+        raise HTTPException(
+            status_code=400,
+            detail="reference_date solo está disponible en desarrollo/pruebas",
+        )
+    try:
+        with conn.transaction(), conn.cursor() as cur:
+            return validate_invoice_from_db(
+                cur,
+                invoice_id,
+                settings.financial_validation,
+                reference_date or datetime.now(ZoneInfo("America/Bogota")).date(),
+            )
+    except ValidationInvoiceNotFoundError as exc:
+        raise HTTPException(status_code=404, detail="Factura no encontrada") from exc
+    except ValidationConflictError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+
+    except ValidationError as exc:
+        raise HTTPException(
+            status_code=409, detail="Datos persistidos incompatibles con validación"
+        ) from exc
+    except psycopg.Error as exc:
+        raise HTTPException(
+            status_code=503, detail="No se pudo completar la validación en PostgreSQL"
+        ) from exc
+
+
+@router.post(
+    "/{invoice_id}/evaluate-exceptions",
+    response_model=Stage5EvaluationOutput,
+    summary="Evaluación inteligente de excepciones con Jev TypeSafe AI (Etapa 5)",
+    description=(
+        "Clasifica las excepciones detectadas por la validación financiera y evalúa el riesgo "
+        "usando Jev TypeSafe AI. Actualiza risk_level, risk_score y risk_confidence en la factura."
+    ),
+)
+def evaluate_invoice_exceptions(
+    invoice_id: UUID,
+    conn: Annotated[psycopg.Connection, Depends(get_db)],
+    settings: Annotated[Settings, Depends(get_settings)],
+) -> Stage5EvaluationOutput:
+    jev_adapter = JevExceptionAdapter(
+        api_key=settings.typesafe_api_key,
+        model=settings.typesafe_model,
+    )
+    service = ExceptionEvaluatorService(jev_adapter=jev_adapter)
+    try:
+        with conn.transaction(), conn.cursor() as cur:
+            return evaluate_invoice_from_db(cur, invoice_id, service)
+    except ExceptionInvoiceNotFoundError as exc:
+        raise HTTPException(status_code=404, detail="Factura no encontrada") from exc
+    except psycopg.Error as exc:
+        raise HTTPException(
+            status_code=503,
+            detail="Error de base de datos durante la evaluación de excepciones",
+        ) from exc
+
+
+@router.post(
+    "/evaluate-exceptions",
+    response_model=Stage5EvaluationOutput,
+    summary="Evaluación directa de excepciones con Jev (Etapa 5 sin DB)",
+    description=(
+        "Evalúa directamente un payload de hallazgos calculados y contexto sin requerir "
+        "persistencia previa. Útil para microservicios, pipelines de prueba y auditorías."
+    ),
+)
+def evaluate_exceptions_direct(
+    payload: Stage5EvaluationInput,
+    settings: Annotated[Settings, Depends(get_settings)],
+) -> Stage5EvaluationOutput:
+    jev_adapter = JevExceptionAdapter(
+        api_key=settings.typesafe_api_key,
+        model=settings.typesafe_model,
+    )
+    service = ExceptionEvaluatorService(jev_adapter=jev_adapter)
+    return service.evaluate_exceptions(payload)
+
+
+@router.post(
+    "/{invoice_id}/proposals",
+    response_model=Stage6ProposalOutput,
+    summary="Generar propuesta contable y explicación de excepciones (Etapa 6)",
+    description=(
+        "Genera la propuesta de causación en accounting_proposals. "
+        "Si no hay excepciones, genera la explicación con plantilla (TEMPLATE); "
+        "si hay excepciones o revisión requerida, usa Claude (CLAUDE)."
+    ),
+)
+def create_invoice_proposal(
+    invoice_id: UUID,
+    conn: Annotated[psycopg.Connection, Depends(get_db)],
+    settings: Annotated[Settings, Depends(get_settings)],
+) -> Stage6ProposalOutput:
+    claude_explainer = ClaudeProposalExplainer(
+        api_key=settings.anthropic_api_key,
+        model=settings.anthropic_model,
+    )
+    service = ProposalService(claude_explainer=claude_explainer)
+    try:
+        with conn.transaction(), conn.cursor() as cur:
+            return generate_proposal_from_db(cur, invoice_id, service)
+    except ProposalInvoiceNotFoundError as exc:
+        raise HTTPException(status_code=404, detail="Factura no encontrada") from exc
+    except psycopg.Error as exc:
+        raise HTTPException(
+            status_code=503,
+            detail="Error de base de datos al generar la propuesta contable",
+        ) from exc
+
+
+@router.get(
+    "/{invoice_id}/proposals",
+    response_model=Stage6ProposalOutput,
+    summary="Consultar propuesta contable vigente de una factura (Etapa 6)",
+)
+def get_invoice_proposal(
+    invoice_id: UUID,
+    conn: Annotated[psycopg.Connection, Depends(get_db)],
+) -> Stage6ProposalOutput:
+    with conn.cursor() as cur:
+        proposal = get_accounting_proposal_from_db(cur, invoice_id)
+        if not proposal:
+            raise HTTPException(
+                status_code=404,
+                detail="No existe propuesta contable generada para esta factura",
+            )
+        return proposal
+
+
+@router.post(
+    "/proposals",
+    response_model=Stage6ProposalOutput,
+    summary="Generar propuesta contable directa (Etapa 6 sin DB)",
+    description=(
+        "Genera directamente la propuesta y explicación para un payload estructurado sin "
+        "consultar la base de datos. Útil para microservicios y auditorías externas."
+    ),
+)
+def create_proposal_direct(
+    payload: Stage6ProposalInput,
+    settings: Annotated[Settings, Depends(get_settings)],
+) -> Stage6ProposalOutput:
+    claude_explainer = ClaudeProposalExplainer(
+        api_key=settings.anthropic_api_key,
+        model=settings.anthropic_model,
+    )
+    service = ProposalService(claude_explainer=claude_explainer)
+    return service.generate_proposal(payload)

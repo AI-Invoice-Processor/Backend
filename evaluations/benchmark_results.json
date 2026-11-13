@@ -1,0 +1,515 @@
+{
+  "rules": {
+    "total_cases": 15,
+    "category_accuracy": 0.8,
+    "risk_level_accuracy": 0.7333,
+    "precision": 1.0,
+    "recall": 1.0,
+    "f1_score": 1.0,
+    "true_positives": 13,
+    "false_positives": 0,
+    "true_negatives": 2,
+    "false_negatives": 0,
+    "avg_latency_ms": 0.0,
+    "min_latency_ms": 0.0,
+    "max_latency_ms": 0.01,
+    "total_cost_usd": 0.0,
+    "cost_per_evaluation_usd": 0.0,
+    "total_input_tokens": 0,
+    "total_output_tokens": 0,
+    "details": [
+      {
+        "case_id": "CASE-01",
+        "expected_category": "amount_mismatch",
+        "predicted_category": "amount_mismatch",
+        "expected_risk": "high",
+        "predicted_risk": "high",
+        "expected_review": true,
+        "predicted_review": true,
+        "latency_ms": 0.03907300560967997
+      },
+      {
+        "case_id": "CASE-02",
+        "expected_category": "amount_mismatch",
+        "predicted_category": "other",
+        "expected_risk": "low",
+        "predicted_risk": "medium",
+        "expected_review": true,
+        "predicted_review": true,
+        "latency_ms": 0.01723199966363609
+      },
+      {
+        "case_id": "CASE-03",
+        "expected_category": "purchase_order_missing",
+        "predicted_category": "missing_support",
+        "expected_risk": "high",
+        "predicted_risk": "medium",
+        "expected_review": true,
+        "predicted_review": true,
+        "latency_ms": 0.00925700442166999
+      },
+      {
+        "case_id": "CASE-04",
+        "expected_category": "duplicate_invoice",
+        "predicted_category": "duplicate_invoice",
+        "expected_risk": "critical",
+        "predicted_risk": "critical",
+        "expected_review": true,
+        "predicted_review": true,
+        "latency_ms": 0.007693997758906335
+      },
+      {
+        "case_id": "CASE-05",
+        "expected_category": "supplier_mismatch",
+        "predicted_category": "supplier_mismatch",
+        "expected_risk": "critical",
+        "predicted_risk": "critical",
+        "expected_review": true,
+        "predicted_review": true,
+        "latency_ms": 0.007222995918709785
+      },
+      {
+        "case_id": "CASE-06",
+        "expected_category": "tax_mismatch",
+        "predicted_category": "tax_mismatch",
+        "expected_risk": "high",
+        "predicted_risk": "high",
+        "expected_review": true,
+        "predicted_review": true,
+        "latency_ms": 0.010388997907284647
+      },
+      {
+        "case_id": "CASE-07",
+        "expected_category": "missing_support",
+        "predicted_category": "missing_support",
+        "expected_risk": "medium",
+        "predicted_risk": "medium",
+        "expected_review": true,
+        "predicted_review": true,
+        "latency_ms": 0.006862996087875217
+      },
+      {
+        "case_id": "CASE-08",
+        "expected_category": "contract_expired",
+        "predicted_category": "contract_expired",
+        "expected_risk": "high",
+        "predicted_risk": "high",
+        "expected_review": true,
+        "predicted_review": true,
+        "latency_ms": 0.006531998224090785
+      },
+      {
+        "case_id": "CASE-09",
+        "expected_category": "incomplete_information",
+        "predicted_category": "incomplete_information",
+        "expected_risk": "high",
+        "predicted_risk": "high",
+        "expected_review": true,
+        "predicted_review": true,
+        "latency_ms": 0.006672999006696045
+      },
+      {
+        "case_id": "CASE-10",
+        "expected_category": "other",
+        "predicted_category": "other",
+        "expected_risk": "low",
+        "predicted_risk": "low",
+        "expected_review": false,
+        "predicted_review": false,
+        "latency_ms": 0.007504000677727163
+      },
+      {
+        "case_id": "CASE-11",
+        "expected_category": "amount_mismatch",
+        "predicted_category": "amount_mismatch",
+        "expected_risk": "high",
+        "predicted_risk": "high",
+        "expected_review": true,
+        "predicted_review": true,
+        "latency_ms": 0.010830000974237919
+      },
+      {
+        "case_id": "CASE-12",
+        "expected_category": "tax_mismatch",
+        "predicted_category": "tax_mismatch",
+        "expected_risk": "medium",
+        "predicted_risk": "high",
+        "expected_review": true,
+        "predicted_review": true,
+        "latency_ms": 0.008285998774226755
+      },
+      {
+        "case_id": "CASE-13",
+        "expected_category": "purchase_order_missing",
+        "predicted_category": "missing_support",
+        "expected_risk": "high",
+        "predicted_risk": "medium",
+        "expected_review": true,
+        "predicted_review": true,
+        "latency_ms": 0.0067020009737461805
+      },
+      {
+        "case_id": "CASE-14",
+        "expected_category": "other",
+        "predicted_category": "other",
+        "expected_risk": "low",
+        "predicted_risk": "low",
+        "expected_review": false,
+        "predicted_review": false,
+        "latency_ms": 0.0071829999797046185
+      },
+      {
+        "case_id": "CASE-15",
+        "expected_category": "supplier_mismatch",
+        "predicted_category": "supplier_mismatch",
+        "expected_risk": "critical",
+        "predicted_risk": "critical",
+        "expected_review": true,
+        "predicted_review": true,
+        "latency_ms": 0.008445997082162648
+      }
+    ]
+  },
+  "jev": {
+    "total_cases": 15,
+    "category_accuracy": 0.9333,
+    "risk_level_accuracy": 0.9333,
+    "precision": 1.0,
+    "recall": 1.0,
+    "f1_score": 1.0,
+    "true_positives": 13,
+    "false_positives": 0,
+    "true_negatives": 2,
+    "false_negatives": 0,
+    "avg_latency_ms": 279.97,
+    "min_latency_ms": 224.92,
+    "max_latency_ms": 575.36,
+    "total_cost_usd": 0.0038,
+    "cost_per_evaluation_usd": 0.000253,
+    "total_input_tokens": 14077,
+    "total_output_tokens": 2814,
+    "details": [
+      {
+        "case_id": "CASE-01",
+        "expected_category": "amount_mismatch",
+        "predicted_category": "amount_mismatch",
+        "expected_risk": "high",
+        "predicted_risk": "high",
+        "expected_review": true,
+        "predicted_review": true,
+        "latency_ms": 262.8008530009538
+      },
+      {
+        "case_id": "CASE-02",
+        "expected_category": "amount_mismatch",
+        "predicted_category": "amount_mismatch",
+        "expected_risk": "low",
+        "predicted_risk": "low",
+        "expected_review": true,
+        "predicted_review": true,
+        "latency_ms": 243.02882899792166
+      },
+      {
+        "case_id": "CASE-03",
+        "expected_category": "purchase_order_missing",
+        "predicted_category": "purchase_order_missing",
+        "expected_risk": "high",
+        "predicted_risk": "high",
+        "expected_review": true,
+        "predicted_review": true,
+        "latency_ms": 267.3828129991307
+      },
+      {
+        "case_id": "CASE-04",
+        "expected_category": "duplicate_invoice",
+        "predicted_category": "duplicate_invoice",
+        "expected_risk": "critical",
+        "predicted_risk": "critical",
+        "expected_review": true,
+        "predicted_review": true,
+        "latency_ms": 225.68624799896497
+      },
+      {
+        "case_id": "CASE-05",
+        "expected_category": "supplier_mismatch",
+        "predicted_category": "supplier_mismatch",
+        "expected_risk": "critical",
+        "predicted_risk": "critical",
+        "expected_review": true,
+        "predicted_review": true,
+        "latency_ms": 235.20838699914748
+      },
+      {
+        "case_id": "CASE-06",
+        "expected_category": "tax_mismatch",
+        "predicted_category": "tax_mismatch",
+        "expected_risk": "high",
+        "predicted_risk": "high",
+        "expected_review": true,
+        "predicted_review": true,
+        "latency_ms": 258.06535499577876
+      },
+      {
+        "case_id": "CASE-07",
+        "expected_category": "missing_support",
+        "predicted_category": "missing_support",
+        "expected_risk": "medium",
+        "predicted_risk": "medium",
+        "expected_review": true,
+        "predicted_review": true,
+        "latency_ms": 289.5999800020945
+      },
+      {
+        "case_id": "CASE-08",
+        "expected_category": "contract_expired",
+        "predicted_category": "contract_expired",
+        "expected_risk": "high",
+        "predicted_risk": "critical",
+        "expected_review": true,
+        "predicted_review": true,
+        "latency_ms": 266.71833699947456
+      },
+      {
+        "case_id": "CASE-09",
+        "expected_category": "incomplete_information",
+        "predicted_category": "incomplete_information",
+        "expected_risk": "high",
+        "predicted_risk": "high",
+        "expected_review": true,
+        "predicted_review": true,
+        "latency_ms": 245.3912670025602
+      },
+      {
+        "case_id": "CASE-10",
+        "expected_category": "other",
+        "predicted_category": "other",
+        "expected_risk": "low",
+        "predicted_risk": "low",
+        "expected_review": false,
+        "predicted_review": false,
+        "latency_ms": 576.0409490030725
+      },
+      {
+        "case_id": "CASE-11",
+        "expected_category": "amount_mismatch",
+        "predicted_category": "amount_mismatch",
+        "expected_risk": "high",
+        "predicted_risk": "high",
+        "expected_review": true,
+        "predicted_review": true,
+        "latency_ms": 317.5681849970715
+      },
+      {
+        "case_id": "CASE-12",
+        "expected_category": "tax_mismatch",
+        "predicted_category": "tax_mismatch",
+        "expected_risk": "medium",
+        "predicted_risk": "medium",
+        "expected_review": true,
+        "predicted_review": true,
+        "latency_ms": 242.7152450036374
+      },
+      {
+        "case_id": "CASE-13",
+        "expected_category": "purchase_order_missing",
+        "predicted_category": "purchase_order_missing",
+        "expected_risk": "high",
+        "predicted_risk": "high",
+        "expected_review": true,
+        "predicted_review": true,
+        "latency_ms": 284.83801299444167
+      },
+      {
+        "case_id": "CASE-14",
+        "expected_category": "other",
+        "predicted_category": "other",
+        "expected_risk": "low",
+        "predicted_risk": "low",
+        "expected_review": false,
+        "predicted_review": false,
+        "latency_ms": 235.12320000008913
+      },
+      {
+        "case_id": "CASE-15",
+        "expected_category": "supplier_mismatch",
+        "predicted_category": "other",
+        "expected_risk": "critical",
+        "predicted_risk": "critical",
+        "expected_review": true,
+        "predicted_review": true,
+        "latency_ms": 260.0016610012972
+      }
+    ]
+  },
+  "claude": {
+    "total_cases": 15,
+    "category_accuracy": 0.8667,
+    "risk_level_accuracy": 0.8667,
+    "precision": 0.8667,
+    "recall": 1.0,
+    "f1_score": 0.9286,
+    "true_positives": 13,
+    "false_positives": 2,
+    "true_negatives": 0,
+    "false_negatives": 0,
+    "avg_latency_ms": 1248.77,
+    "min_latency_ms": 1152.35,
+    "max_latency_ms": 1328.99,
+    "total_cost_usd": 0.025293,
+    "cost_per_evaluation_usd": 0.001686,
+    "total_input_tokens": 4721,
+    "total_output_tokens": 742,
+    "details": [
+      {
+        "case_id": "CASE-01",
+        "expected_category": "amount_mismatch",
+        "predicted_category": "amount_mismatch",
+        "expected_risk": "high",
+        "predicted_risk": "high",
+        "expected_review": true,
+        "predicted_review": true,
+        "latency_ms": 2020.9697709942702
+      },
+      {
+        "case_id": "CASE-02",
+        "expected_category": "amount_mismatch",
+        "predicted_category": "amount_mismatch",
+        "expected_risk": "low",
+        "predicted_risk": "low",
+        "expected_review": true,
+        "predicted_review": true,
+        "latency_ms": 1219.4601189985406
+      },
+      {
+        "case_id": "CASE-03",
+        "expected_category": "purchase_order_missing",
+        "predicted_category": "purchase_order_missing",
+        "expected_risk": "high",
+        "predicted_risk": "high",
+        "expected_review": true,
+        "predicted_review": true,
+        "latency_ms": 1229.147516998637
+      },
+      {
+        "case_id": "CASE-04",
+        "expected_category": "duplicate_invoice",
+        "predicted_category": "duplicate_invoice",
+        "expected_risk": "critical",
+        "predicted_risk": "critical",
+        "expected_review": true,
+        "predicted_review": true,
+        "latency_ms": 1235.390580004605
+      },
+      {
+        "case_id": "CASE-05",
+        "expected_category": "supplier_mismatch",
+        "predicted_category": "supplier_mismatch",
+        "expected_risk": "critical",
+        "predicted_risk": "critical",
+        "expected_review": true,
+        "predicted_review": true,
+        "latency_ms": 1202.501403997303
+      },
+      {
+        "case_id": "CASE-06",
+        "expected_category": "tax_mismatch",
+        "predicted_category": "tax_mismatch",
+        "expected_risk": "high",
+        "predicted_risk": "high",
+        "expected_review": true,
+        "predicted_review": true,
+        "latency_ms": 1306.6325769977993
+      },
+      {
+        "case_id": "CASE-07",
+        "expected_category": "missing_support",
+        "predicted_category": "missing_support",
+        "expected_risk": "medium",
+        "predicted_risk": "medium",
+        "expected_review": true,
+        "predicted_review": true,
+        "latency_ms": 1152.4309879969223
+      },
+      {
+        "case_id": "CASE-08",
+        "expected_category": "contract_expired",
+        "predicted_category": "contract_expired",
+        "expected_risk": "high",
+        "predicted_risk": "high",
+        "expected_review": true,
+        "predicted_review": true,
+        "latency_ms": 1227.4077180045424
+      },
+      {
+        "case_id": "CASE-09",
+        "expected_category": "incomplete_information",
+        "predicted_category": "incomplete_information",
+        "expected_risk": "high",
+        "predicted_risk": "high",
+        "expected_review": true,
+        "predicted_review": true,
+        "latency_ms": 1220.2987210039282
+      },
+      {
+        "case_id": "CASE-10",
+        "expected_category": "other",
+        "predicted_category": "purchase_order_missing",
+        "expected_risk": "low",
+        "predicted_risk": "medium",
+        "expected_review": false,
+        "predicted_review": true,
+        "latency_ms": 1284.3068280053558
+      },
+      {
+        "case_id": "CASE-11",
+        "expected_category": "amount_mismatch",
+        "predicted_category": "amount_mismatch",
+        "expected_risk": "high",
+        "predicted_risk": "high",
+        "expected_review": true,
+        "predicted_review": true,
+        "latency_ms": 1229.5566690008854
+      },
+      {
+        "case_id": "CASE-12",
+        "expected_category": "tax_mismatch",
+        "predicted_category": "tax_mismatch",
+        "expected_risk": "medium",
+        "predicted_risk": "medium",
+        "expected_review": true,
+        "predicted_review": true,
+        "latency_ms": 1328.4309139999095
+      },
+      {
+        "case_id": "CASE-13",
+        "expected_category": "purchase_order_missing",
+        "predicted_category": "purchase_order_missing",
+        "expected_risk": "high",
+        "predicted_risk": "high",
+        "expected_review": true,
+        "predicted_review": true,
+        "latency_ms": 1242.9742509993957
+      },
+      {
+        "case_id": "CASE-14",
+        "expected_category": "other",
+        "predicted_category": "purchase_order_missing",
+        "expected_risk": "low",
+        "predicted_risk": "medium",
+        "expected_review": false,
+        "predicted_review": true,
+        "latency_ms": 1329.0503980024369
+      },
+      {
+        "case_id": "CASE-15",
+        "expected_category": "supplier_mismatch",
+        "predicted_category": "supplier_mismatch",
+        "expected_risk": "critical",
+        "predicted_risk": "critical",
+        "expected_review": true,
+        "predicted_review": true,
+        "latency_ms": 1250.1929620048031
+      }
+    ]
+  }
+}
