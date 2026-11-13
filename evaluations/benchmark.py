@@ -40,7 +40,9 @@ from app.schemas.exceptions import (
     Stage5EvaluationOutput,
 )
 
-logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
+logging.basicConfig(
+    level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s"
+)
 logger = logging.getLogger("benchmark")
 
 BASE_DIR = Path(__file__).resolve().parent
@@ -62,7 +64,9 @@ def load_dataset() -> list[dict[str, Any]]:
 
 def calculate_cost(approach: str, input_tokens: int, output_tokens: int) -> float:
     rates = PRICING.get(approach, {"input": 0.0, "output": 0.0})
-    cost = (input_tokens / 1_000_000.0) * rates["input"] + (output_tokens / 1_000_000.0) * rates["output"]
+    cost = (input_tokens / 1_000_000.0) * rates["input"] + (
+        output_tokens / 1_000_000.0
+    ) * rates["output"]
     return cost
 
 
@@ -118,7 +122,9 @@ def run_benchmark():
             # Construct Pydantic model
             inp_data = Stage5EvaluationInput(
                 invoice_id=case["input"]["invoice_id"],
-                exceptions=[ExceptionFindingInput(**e) for e in case["input"]["exceptions"]],
+                exceptions=[
+                    ExceptionFindingInput(**e) for e in case["input"]["exceptions"]
+                ],
                 context=EvaluationContextInput(**case["input"]["context"]),
             )
 
@@ -135,7 +141,11 @@ def run_benchmark():
             out_tok = out.audit_trace.output_tokens or 0 if out.audit_trace else 0
             total_input_tokens += in_tok
             total_output_tokens += out_tok
-            latencies.append(out.audit_trace.latency_ms if (out.audit_trace and out.audit_trace.latency_ms > 0) else elapsed_ms)
+            latencies.append(
+                out.audit_trace.latency_ms
+                if (out.audit_trace and out.audit_trace.latency_ms > 0)
+                else elapsed_ms
+            )
 
             # Accuracy
             if pred_cat == exp_cat:
@@ -153,21 +163,27 @@ def run_benchmark():
             elif exp_review and not pred_review:
                 fn += 1
 
-            details.append({
-                "case_id": cid,
-                "expected_category": exp_cat,
-                "predicted_category": pred_cat,
-                "expected_risk": exp_risk,
-                "predicted_risk": pred_risk,
-                "expected_review": exp_review,
-                "predicted_review": pred_review,
-                "latency_ms": elapsed_ms,
-            })
+            details.append(
+                {
+                    "case_id": cid,
+                    "expected_category": exp_cat,
+                    "predicted_category": pred_cat,
+                    "expected_risk": exp_risk,
+                    "predicted_risk": pred_risk,
+                    "expected_review": exp_review,
+                    "predicted_review": pred_review,
+                    "latency_ms": elapsed_ms,
+                }
+            )
 
         total = len(dataset)
         precision = tp / (tp + fp) if (tp + fp) > 0 else 1.0
         recall = tp / (tp + fn) if (tp + fn) > 0 else 1.0
-        f1 = (2 * precision * recall) / (precision + recall) if (precision + recall) > 0 else 0.0
+        f1 = (
+            (2 * precision * recall) / (precision + recall)
+            if (precision + recall) > 0
+            else 0.0
+        )
         avg_latency = sum(latencies) / len(latencies) if latencies else 0.0
         total_cost = calculate_cost(name, total_input_tokens, total_output_tokens)
         cost_per_eval = total_cost / total if total > 0 else 0.0
@@ -202,7 +218,9 @@ def run_benchmark():
     print("\n" + "=" * 80)
     print("RESUMEN DE BENCHMARK COMPARATIVO")
     print("=" * 80)
-    print(f"{'Métrica':<30} | {'Reglas Tradicionales':<16} | {'Jev TypeSafe AI':<16} | {'Claude Sonnet':<16}")
+    print(
+        f"{'Métrica':<30} | {'Reglas Tradicionales':<16} | {'Jev TypeSafe AI':<16} | {'Claude Sonnet':<16}"
+    )
     print("-" * 86)
     m_names = [
         ("category_accuracy", "Exactitud Categoría"),
