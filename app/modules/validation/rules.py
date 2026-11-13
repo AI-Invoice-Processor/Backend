@@ -110,15 +110,33 @@ def v2(data, config):
 
 def v3(data, config):
     checks = []
+    subtotal = data.invoice.subtotal
     for index, tax in enumerate(data.invoice.taxes):
         if tax.type.upper() != "IVA":
             continue
-        if tax.rate is None or tax.base is None or tax.amount is None:
+
+        base = tax.base
+        # Inferencia matemática: si la base no viene declarada explícitamente pero
+        # la tarifa y el importe sí, y coinciden exactamente con subtotal * rate,
+        # la base imponible es el subtotal.
+        if (
+            base is None
+            and tax.rate is not None
+            and tax.amount is not None
+            and subtotal is not None
+        ):
+            with localcontext() as ctx:
+                ctx.prec = 60
+                expected_tax = subtotal * tax.rate
+            if abs(expected_tax - tax.amount) <= config.arithmetic_tolerance:
+                base = subtotal
+
+        if tax.rate is None or base is None or tax.amount is None:
             check = missing("V3", "IVA sin base, tarifa o importe")
         elif tax.rate not in config.vat_rates:
             check = missing("V3", "Tarifa IVA no soportada", "UNSUPPORTED_VAT_RATE")
         else:
-            check = money("V3", tax.base * tax.rate, tax.amount, config)
+            check = money("V3", base * tax.rate, tax.amount, config)
         check.evidence_refs = [{"field": f"taxes[{index}]"}]
         checks.append(check)
     return checks or [missing("V3", "No hay IVA declarado")]
