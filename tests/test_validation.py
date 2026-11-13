@@ -449,3 +449,22 @@ def test_production_reference_date_rejected(monkeypatch):
         == 400
     )
     execute.assert_not_called()
+
+
+def test_null_vat_base_is_inferred_from_subtotal_when_arithmetic_matches():
+    data = sample()
+    # Emular una factura donde el IVA no declara base explícita, solo tarifa e importe
+    data.invoice.taxes[0].base = None
+    check = checks(data)["V3"]
+    assert check.result == "passed"
+    assert check.expected_amount == Decimal("19.00")
+    assert check.actual_amount == Decimal("19.00")
+
+
+def test_null_vat_base_fails_if_does_not_match_subtotal():
+    data = sample()
+    data.invoice.taxes[0].base = None
+    data.invoice.taxes[0].amount = Decimal("25.00")  # no coincide con 100 * 0.19
+    check = checks(data)["V3"]
+    assert check.result == "not_evaluated"
+    assert check.reason == "IVA sin base, tarifa o importe"
