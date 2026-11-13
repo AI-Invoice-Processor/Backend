@@ -1,0 +1,406 @@
+[
+  {
+    "id": "CASE-01",
+    "description": "Diferencia sustancial vs Orden de Compra (4% / $2M COP)",
+    "input": {
+      "invoice_id": "7c9e6679-7425-40de-944b-e07fc1f90ae7",
+      "exceptions": [
+        {
+          "type": "DIFERENCIA_VS_OC",
+          "difference": "2000000.00",
+          "difference_percentage": "4.00",
+          "severity": "high",
+          "description": "Total facturado excede el valor de la orden de compra en $2,000,000"
+        }
+      ],
+      "context": {
+        "supplier_matched": true,
+        "contract_active": true,
+        "support_complete": true,
+        "duplicate_detected": false,
+        "extraction_confidence": 0.98
+      }
+    },
+    "ground_truth": {
+      "expected_category": "amount_mismatch",
+      "expected_risk_level": "high",
+      "requires_human_review": true
+    }
+  },
+  {
+    "id": "CASE-02",
+    "description": "Desviación mínima por redondeo de centavos (< $1 COP)",
+    "input": {
+      "invoice_id": "a1b2c3d4-e5f6-7a8b-9c0d-1e2f3a4b5c6d",
+      "exceptions": [
+        {
+          "type": "DIFERENCIA_ARITMETICA",
+          "difference": "0.45",
+          "difference_percentage": "0.0001",
+          "severity": "low",
+          "description": "Diferencia de redondeo en subtotal de $0.45 COP"
+        }
+      ],
+      "context": {
+        "supplier_matched": true,
+        "contract_active": true,
+        "support_complete": true,
+        "duplicate_detected": false,
+        "extraction_confidence": 0.99
+      }
+    },
+    "ground_truth": {
+      "expected_category": "amount_mismatch",
+      "expected_risk_level": "low",
+      "requires_human_review": true
+    }
+  },
+  {
+    "id": "CASE-03",
+    "description": "Factura sin orden de compra vinculada",
+    "input": {
+      "invoice_id": "b2c3d4e5-f6a7-8b9c-0d1e-2f3a4b5c6d7e",
+      "exceptions": [
+        {
+          "type": "SIN_ORDEN_COMPRA",
+          "difference": null,
+          "difference_percentage": null,
+          "severity": "high",
+          "description": "Factura emitida sin orden de compra asociada en el sistema"
+        }
+      ],
+      "context": {
+        "supplier_matched": true,
+        "contract_active": true,
+        "support_complete": false,
+        "duplicate_detected": false,
+        "extraction_confidence": 0.96
+      }
+    },
+    "ground_truth": {
+      "expected_category": "purchase_order_missing",
+      "expected_risk_level": "high",
+      "requires_human_review": true
+    }
+  },
+  {
+    "id": "CASE-04",
+    "description": "Factura duplicada por hash SHA256 y número",
+    "input": {
+      "invoice_id": "c3d4e5f6-a7b8-9c0d-1e2f-3a4b5c6d7e8f",
+      "exceptions": [
+        {
+          "type": "FACTURA_DUPLICADA",
+          "difference": null,
+          "difference_percentage": null,
+          "severity": "critical",
+          "description": "Documento idéntico ya procesado y pagado previamente"
+        }
+      ],
+      "context": {
+        "supplier_matched": true,
+        "contract_active": true,
+        "support_complete": true,
+        "duplicate_detected": true,
+        "extraction_confidence": 0.99
+      }
+    },
+    "ground_truth": {
+      "expected_category": "duplicate_invoice",
+      "expected_risk_level": "critical",
+      "requires_human_review": true
+    }
+  },
+  {
+    "id": "CASE-05",
+    "description": "Discrepancia en NIT o razón social del proveedor",
+    "input": {
+      "invoice_id": "d4e5f6a7-b8c9-0d1e-2f3a-4b5c6d7e8f9a",
+      "exceptions": [
+        {
+          "type": "PROVEEDOR_NO_COINCIDE",
+          "difference": null,
+          "difference_percentage": null,
+          "severity": "critical",
+          "description": "NIT de la factura no existe en el catálogo maestro de proveedores"
+        }
+      ],
+      "context": {
+        "supplier_matched": false,
+        "contract_active": false,
+        "support_complete": true,
+        "duplicate_detected": false,
+        "extraction_confidence": 0.94
+      }
+    },
+    "ground_truth": {
+      "expected_category": "supplier_mismatch",
+      "expected_risk_level": "critical",
+      "requires_human_review": true
+    }
+  },
+  {
+    "id": "CASE-06",
+    "description": "Tarifa de IVA incorrecta aplicada (16% en vez de 19%)",
+    "input": {
+      "invoice_id": "e5f6a7b8-c9d0-1e2f-3a4b-5c6d7e8f9a0b",
+      "exceptions": [
+        {
+          "type": "IVA_DISCREPANCIA",
+          "difference": "450000.00",
+          "difference_percentage": "15.79",
+          "severity": "high",
+          "description": "IVA calculado al 16% no coincide con tarifa estatutaria del 19%"
+        }
+      ],
+      "context": {
+        "supplier_matched": true,
+        "contract_active": true,
+        "support_complete": true,
+        "duplicate_detected": false,
+        "extraction_confidence": 0.97
+      }
+    },
+    "ground_truth": {
+      "expected_category": "tax_mismatch",
+      "expected_risk_level": "high",
+      "requires_human_review": true
+    }
+  },
+  {
+    "id": "CASE-07",
+    "description": "Falta acta de recepción o remisión de soporte",
+    "input": {
+      "invoice_id": "f6a7b8c9-d0e1-2f3a-4b5c-6d7e8f9a0b1c",
+      "exceptions": [
+        {
+          "type": "SOPORTE_FALTANTE",
+          "difference": null,
+          "difference_percentage": null,
+          "severity": "medium",
+          "description": "No se encontró acta de entrega de servicios requerida"
+        }
+      ],
+      "context": {
+        "supplier_matched": true,
+        "contract_active": true,
+        "support_complete": false,
+        "duplicate_detected": false,
+        "extraction_confidence": 0.95
+      }
+    },
+    "ground_truth": {
+      "expected_category": "missing_support",
+      "expected_risk_level": "medium",
+      "requires_human_review": true
+    }
+  },
+  {
+    "id": "CASE-08",
+    "description": "Contrato marco vencido antes de la fecha de emisión",
+    "input": {
+      "invoice_id": "07b8c9d0-e1f2-3a4b-5c6d-7e8f9a0b1c2d",
+      "exceptions": [
+        {
+          "type": "CONTRATO_VENCIDO",
+          "difference": null,
+          "difference_percentage": null,
+          "severity": "high",
+          "description": "Fecha de factura posterior a fecha de finalización del contrato"
+        }
+      ],
+      "context": {
+        "supplier_matched": true,
+        "contract_active": false,
+        "support_complete": true,
+        "duplicate_detected": false,
+        "extraction_confidence": 0.96
+      }
+    },
+    "ground_truth": {
+      "expected_category": "contract_expired",
+      "expected_risk_level": "high",
+      "requires_human_review": true
+    }
+  },
+  {
+    "id": "CASE-09",
+    "description": "Extracción OCR de baja calidad con campos ilegibles",
+    "input": {
+      "invoice_id": "18c9d0e1-f2a3-4b5c-6d7e-8f9a0b1c2d3e",
+      "exceptions": [
+        {
+          "type": "DATOS_INCOMPLETOS",
+          "difference": null,
+          "difference_percentage": null,
+          "severity": "high",
+          "description": "Líneas de detalle y subtotal con baja legibilidad óptica"
+        }
+      ],
+      "context": {
+        "supplier_matched": true,
+        "contract_active": true,
+        "support_complete": true,
+        "duplicate_detected": false,
+        "extraction_confidence": 0.62
+      }
+    },
+    "ground_truth": {
+      "expected_category": "incomplete_information",
+      "expected_risk_level": "high",
+      "requires_human_review": true
+    }
+  },
+  {
+    "id": "CASE-10",
+    "description": "Factura limpia perfectamente conciliada sin excepciones",
+    "input": {
+      "invoice_id": "29d0e1f2-a3b4-5c6d-7e8f-9a0b1c2d3e4f",
+      "exceptions": [],
+      "context": {
+        "supplier_matched": true,
+        "contract_active": true,
+        "support_complete": true,
+        "duplicate_detected": false,
+        "extraction_confidence": 0.99
+      }
+    },
+    "ground_truth": {
+      "expected_category": "other",
+      "expected_risk_level": "low",
+      "requires_human_review": false
+    }
+  },
+  {
+    "id": "CASE-11",
+    "description": "Diferencia de precio unitario en línea vs orden de compra",
+    "input": {
+      "invoice_id": "3ae1f2a3-b4c5-6d7e-8f9a-0b1c2d3e4f50",
+      "exceptions": [
+        {
+          "type": "DIFERENCIA_LINEA_PRECIO",
+          "difference": "1500000.00",
+          "difference_percentage": "12.50",
+          "severity": "high",
+          "description": "Precio unitario cobrado supera en 12.5% el precio pactado en la OC"
+        }
+      ],
+      "context": {
+        "supplier_matched": true,
+        "contract_active": true,
+        "support_complete": true,
+        "duplicate_detected": false,
+        "extraction_confidence": 0.97
+      }
+    },
+    "ground_truth": {
+      "expected_category": "amount_mismatch",
+      "expected_risk_level": "high",
+      "requires_human_review": true
+    }
+  },
+  {
+    "id": "CASE-12",
+    "description": "Discrepancia menor en retención en la fuente (ICA)",
+    "input": {
+      "invoice_id": "4bf2a3b4-c5d6-7e8f-9a0b-1c2d3e4f5061",
+      "exceptions": [
+        {
+          "type": "RETENCION_INEXACTA",
+          "difference": "3500.00",
+          "difference_percentage": "1.20",
+          "severity": "medium",
+          "description": "Diferencia de $3,500 en cálculo de ReteICA"
+        }
+      ],
+      "context": {
+        "supplier_matched": true,
+        "contract_active": true,
+        "support_complete": true,
+        "duplicate_detected": false,
+        "extraction_confidence": 0.95
+      }
+    },
+    "ground_truth": {
+      "expected_category": "tax_mismatch",
+      "expected_risk_level": "medium",
+      "requires_human_review": true
+    }
+  },
+  {
+    "id": "CASE-13",
+    "description": "Factura con descripción ambigua y orden no especificada",
+    "input": {
+      "invoice_id": "5c03b4c5-d6e7-8f9a-0b1c-2d3e4f506172",
+      "exceptions": [
+        {
+          "type": "ORDEN_NO_ESPECIFICADA",
+          "difference": null,
+          "difference_percentage": null,
+          "severity": "high",
+          "description": "Orden de compra mencionada no existe en base de datos"
+        }
+      ],
+      "context": {
+        "supplier_matched": true,
+        "contract_active": true,
+        "support_complete": false,
+        "duplicate_detected": false,
+        "extraction_confidence": 0.78
+      }
+    },
+    "ground_truth": {
+      "expected_category": "purchase_order_missing",
+      "expected_risk_level": "high",
+      "requires_human_review": true
+    }
+  },
+  {
+    "id": "CASE-14",
+    "description": "Factura de servicios públicos recurrente sin desviación",
+    "input": {
+      "invoice_id": "6d14c5d6-e7f8-9a0b-1c2d-3e4f50617283",
+      "exceptions": [],
+      "context": {
+        "supplier_matched": true,
+        "contract_active": true,
+        "support_complete": true,
+        "duplicate_detected": false,
+        "extraction_confidence": 0.98
+      }
+    },
+    "ground_truth": {
+      "expected_category": "other",
+      "expected_risk_level": "low",
+      "requires_human_review": false
+    }
+  },
+  {
+    "id": "CASE-15",
+    "description": "Proveedor no habilitado para facturar en régimen común",
+    "input": {
+      "invoice_id": "7e25d6e7-f8a9-0b1c-2d3e-4f5061728394",
+      "exceptions": [
+        {
+          "type": "PROVEEDOR_NO_HABILITADO",
+          "difference": null,
+          "difference_percentage": null,
+          "severity": "critical",
+          "description": "NIT de proveedor inhabilitado o suspendido ante la DIAN"
+        }
+      ],
+      "context": {
+        "supplier_matched": false,
+        "contract_active": false,
+        "support_complete": false,
+        "duplicate_detected": false,
+        "extraction_confidence": 0.92
+      }
+    },
+    "ground_truth": {
+      "expected_category": "supplier_mismatch",
+      "expected_risk_level": "critical",
+      "requires_human_review": true
+    }
+  }
+]
