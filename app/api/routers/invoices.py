@@ -18,6 +18,12 @@ from pydantic import ValidationError
 
 import app.main as main_module
 from app.api.dependencies import Settings, get_db, get_settings
+from app.modules.exceptions import (
+    ExceptionEvaluatorService,
+    InvoiceNotFoundError as ExceptionInvoiceNotFoundError,
+    JevExceptionAdapter,
+    evaluate_invoice_from_db,
+)
 from app.modules.invoices import (
     get_invoice_business_and_duplicate_status,
     get_invoice_detail_from_db,
@@ -32,6 +38,7 @@ from app.modules.validation.repository import (
     ValidationConflictError,
     validate_invoice_from_db,
 )
+from app.schemas.exceptions import Stage5EvaluationInput, Stage5EvaluationOutput
 from app.schemas.invoice import InvoiceDetail, InvoiceListItem, UploadInvoiceResponse
 from app.schemas.matching import InvoiceMatchingResponse
 from app.schemas.validation import ValidationOutput
@@ -239,3 +246,55 @@ def validate_invoice(
         raise HTTPException(
             status_code=503, detail="No se pudo completar la validación en PostgreSQL"
         ) from exc
+
+
+@router.post(
+    "/{invoice_id}/evaluate-exceptions",
+    response_model=Stage5EvaluationOutput,
+    summary="Evaluación inteligente de excepciones con Jev TypeSafe AI (Etapa 5)",
+    description=(
+        "Clasifica las excepciones detectadas por la validación financiera y evalúa el riesgo "
+        "usando Jev TypeSafe AI. Actualiza risk_level, risk_score y risk_confidence en la factura."
+    ),
+)
+def evaluate_invoice_exceptions(
+    invoice_id: UUID,
+    conn: Annotated[psycopg.Connection, Depends(get_db)],
+    settings: Annotated[Settings, Depends(get_settings)],
+) -> Stage5EvaluationOutput:
+    jev_adapter = JevExceptionAdapter(
+        api_key=settings.typesafe_api_key,
+        model=settings.typesafe_model,
+    )
+    service = ExceptionEvaluatorService(jev_adapter=jev_adapter)
+    try:
+        with conn.transaction(), conn.cursor() as cur:
+            return evaluate_invoice_from_db(cur, invoice_id, service)
+    except ExceptionInvoiceNotFoundError as exc:
+        raise HTTPException(status_code=404, detail="Factura no encontrada") from exc
+    except psycopg.Error as exc:
+        raise HTTPException(
+            status_code=503, detail="Error de base de datos durante la evaluación de excepciones"
+        ) from exc
+
+
+@router.post(
+    "/evaluate-exceptions",
+    response_model=Stage5EvaluationOutput,
+    summary="Evaluación directa de excepciones con Jev (Etapa 5 sin DB)",
+    description=(
+        "Evalúa directamente un payload de hallazgos calculados y contexto sin requerir "
+        "persistencia previa. Útil para microservicios, pipelines de prueba y auditorías."
+    ),
+)
+def evaluate_exceptions_direct(
+    payload: Stage5EvaluationInput,
+    settings: Annotated[Settings, Depends(get_settings)],
+) -> Stage5EvaluationOutput:
+    jev_adapter = JevExceptionAdapter(
+        api_key=settings.typesafe_api_key,
+        model=settings.typesafe_model,
+    )
+    service = ExceptionEvaluatorService(jev_adapter=jev_adapter)
+    return service.evaluate_exceptions(payload)
+
