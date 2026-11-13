@@ -1,4 +1,5 @@
 import json
+import logging
 from datetime import datetime
 from decimal import Decimal, InvalidOperation
 from pathlib import Path
@@ -36,6 +37,7 @@ from app.state_machine import (
 )
 
 router = APIRouter(prefix="/api/workspace", tags=["workspace"])
+logger = logging.getLogger(__name__)
 
 
 class HumanAction(BaseModel):
@@ -357,8 +359,14 @@ def process_workspace_pipeline(
             with conn.transaction(), conn.cursor() as cur:
                 _ensure_pipeline(cur, invoice_id, settings)
             processed.append(str(invoice_id))
-        except Exception as exc:  # noqa: BLE001 - keep other invoices running
-            failures.append({"invoice_id": str(invoice_id), "error": str(exc)})
+        except Exception:
+            logger.exception("Workspace pipeline failed for invoice %s", invoice_id)
+            failures.append(
+                {
+                    "invoice_id": str(invoice_id),
+                    "error": "No se pudo procesar la factura.",
+                }
+            )
 
     return {
         "processed": len(processed),
