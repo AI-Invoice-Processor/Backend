@@ -106,12 +106,30 @@ def test_tolerance_boundary(amount, expected):
     assert checks(data)["V4"].result == expected
 
 
-def test_null_discount_requires_explicit_known_absence():
+def test_null_discount_is_inferred_only_when_line_adds_up_without_it():
     data = sample()
     data.invoice.lines[0].discount_amount = None
-    assert checks(data)["V1"].result == "not_evaluated"
+    check = checks(data)["V1"]
+    assert check.result == "passed"
+    assert check.reason_code == "NO_DISCOUNT_INFERRED"
+
+
+def test_null_discount_with_mismatch_stays_uncertain():
+    data = sample()
+    data.invoice.lines[0].discount_amount = None
+    data.invoice.lines[0].amount = Decimal(90)
+    check = checks(data)["V1"]
+    assert check.result == "not_evaluated"
+    assert check.reason_code == "UNCERTAIN_DISCOUNT"
+    assert check.invoice_line_no == 1
+
+
+def test_known_no_discount_lines_still_forces_zero_discount():
+    data = sample()
+    data.invoice.lines[0].discount_amount = None
+    data.invoice.lines[0].amount = Decimal(90)
     data.known_no_discount_lines = [1]
-    assert checks(data)["V1"].result == "passed"
+    assert checks(data)["V1"].result == "failed"
 
 
 def test_multiple_lines_and_missing_amount():

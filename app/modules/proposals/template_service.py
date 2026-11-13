@@ -42,3 +42,45 @@ def generate_template_explanation(input_data: Stage6ProposalInput) -> Explanatio
         details=details,
         recommendation=recommendation,
     )
+
+
+_DATA_GAP_PREFIXES = ("MISSING_", "UNCERTAIN_", "UNSUPPORTED_")
+
+
+def is_data_gap(exc) -> bool:
+    """True when the exception means 'could not evaluate', not a value mismatch."""
+    code = (exc.reason_code or exc.type or "").upper()
+    return code.startswith(_DATA_GAP_PREFIXES)
+
+
+def generate_data_gap_explanation(input_data: Stage6ProposalInput) -> Explanation:
+    """Deterministic explanation when every exception is a data gap (no LLM)."""
+    doc_refs = input_data.document_references
+    inv_num = doc_refs.get("number") or str(input_data.invoice_id)[:8]
+    prefix = doc_refs.get("prefix") or ""
+    full_invoice_num = f"{prefix}-{inv_num}".strip("-")
+
+    items = []
+    for exc in input_data.validation_exceptions:
+        rule = exc.rule_id or exc.type
+        line = f" (línea {exc.invoice_line_no})" if exc.invoice_line_no else ""
+        items.append(f"{rule}{line}: {exc.description or 'datos insuficientes'}")
+
+    passed = sorted({c.rule_id for c in input_data.passed_checks})
+    passed_text = (
+        f" Los controles {', '.join(passed)} sí se evaluaron y pasaron."
+        if passed
+        else ""
+    )
+
+    return Explanation(
+        summary=(
+            f"La factura {full_invoice_num} no tiene diferencias de valor detectadas, "
+            f"pero {len(items)} control(es) no se pudieron evaluar por datos insuficientes."
+        ),
+        details="; ".join(items) + "." + passed_text,
+        recommendation=(
+            "Completar o corregir los datos indicados (o la configuración del sistema "
+            "si el motivo es de configuración) y reprocesar la factura."
+        ),
+    )

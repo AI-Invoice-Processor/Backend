@@ -17,6 +17,7 @@ from app.schemas.proposals import (
     AccountingContextInput,
     AmountsContextInput,
     Explanation,
+    PassedCheckItem,
     ProposalMetadata,
     RiskAssessmentContextInput,
     Stage6ProposalInput,
@@ -321,3 +322,87 @@ def test_fastapi_proposal_endpoints(clean_invoice_input, exception_invoice_input
         assert data_exc["schema_version"] == "0.2.0"
         assert data_exc["generated_by"] == "CLAUDE"
         assert data_exc["accounting_proposal"]["status"] == "BLOCKED_PENDING_REVIEW"
+
+
+def _with_exceptions(base: Stage6ProposalInput, exceptions) -> Stage6ProposalInput:
+    return base.model_copy(
+        update={
+            "validation_exceptions": exceptions,
+            "passed_checks": [
+                PassedCheckItem(rule_id="D2", reason="Esperado 46000000.00"),
+                PassedCheckItem(rule_id="V6", reason="Sin duplicados"),
+            ],
+            "risk_assessment": RiskAssessmentContextInput(
+                risk_level="medium", requires_human_review=True
+            ),
+        }
+    )
+
+
+def test_data_gap_exceptions_use_template_without_calling_claude(
+    clean_invoice_input,
+):
+    explainer = MagicMock(spec=ClaudeProposalExplainer)
+    data = _with_exceptions(
+        clean_invoice_input,
+        [
+            ValidationExceptionItem(
+                type="MISSING_PERIODS",
+                rule_id="V7",
+                reason_code="MISSING_PERIODS",
+                description="No hay periodos abiertos configurados",
+            ),
+            ValidationExceptionItem(
+                type="UNCERTAIN_DISCOUNT",
+                rule_id="V1",
+                reason_code="UNCERTAIN_DISCOUNT",
+                invoice_line_no=1,
+                description="Descuento no declarado",
+            ),
+        ],
+    )
+
+    output = ProposalService(claude_explainer=explainer).generate_proposal(data)
+
+    explainer.explain_exceptions.assert_not_called()
+    assert output.generated_by == "TEMPLATE"
+    assert output.accounting_proposal.status == "BLOCKED_PENDING_REVIEW"
+    assert "V7" in output.explanation.details
+    assert "V1 (línea 1)" in output.explanation.details
+    assert "D2, V6" in output.explanation.details
+
+
+def test_value_mismatch_still_goes_to_claude_with_rule_context(clean_invoice_input):
+    explainer = MagicMock(spec=ClaudeProposalExplainer)
+    explainer.explain_exceptions.return_value = (
+        Explanation(summary="s", details="d", recommendation="r"),
+        ProposalMetadata(
+            latency_ms=1.0,
+            input_tokens=1,
+            output_tokens=1,
+            model="m",
+            account_validation_status="VALIDATED",
+        ),
+    )
+    data = _with_exceptions(
+        clean_invoice_input,
+        [
+            ValidationExceptionItem(
+                type="AMOUNT_MISMATCH",
+                rule_id="V2",
+                reason_code="AMOUNT_MISMATCH",
+                expected="46000000.00",
+                actual="47000000.00",
+                difference="1000000.00",
+            ),
+            ValidationExceptionItem(type="MISSING_PERIODS", rule_id="V7"),
+        ],
+    )
+
+    output = ProposalService(claude_explainer=explainer).generate_proposal(data)
+
+    explainer.explain_exceptions.assert_called_once()
+    assert output.generated_by == "CLAUDE"
+    sent = explainer.explain_exceptions.call_args.args[0]
+    assert sent.validation_exceptions[0].rule_id == "V2"
+    assert [c.rule_id for c in sent.passed_checks] == ["D2", "V6"]

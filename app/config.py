@@ -24,7 +24,11 @@ class Settings(BaseSettings):
     financial_validation: RuleConfig = Field(default_factory=RuleConfig)
     documents_dir: Path = Path("data/documents")
 
-    model_config = SettingsConfigDict(env_file=".env", extra="ignore")
+    # env_ignore_empty: compose passes unset vars as "" (e.g. FINANCIAL_VALIDATION),
+    # which would fail JSON parsing at startup instead of using the default.
+    model_config = SettingsConfigDict(
+        env_file=".env", extra="ignore", env_ignore_empty=True
+    )
 
     @property
     def cors_origins(self) -> list[str]:

@@ -9,6 +9,7 @@ from app.modules.validation.repository import get_current_validation_from_db
 from app.schemas.proposals import (
     AccountingContextInput,
     AmountsContextInput,
+    PassedCheckItem,
     RiskAssessmentContextInput,
     Stage6ProposalInput,
     Stage6ProposalOutput,
@@ -207,8 +208,17 @@ def generate_proposal_from_db(
     # 1. Fetch Stage 4 validation exceptions
     validation_output = get_current_validation_from_db(cur, invoice_id)
     validation_exceptions: list[ValidationExceptionItem] = []
+    passed_checks: list[PassedCheckItem] = []
 
     if validation_output:
+        checks_by_id = {c.rule_check_id: c for c in validation_output.checks}
+        passed_checks = [
+            PassedCheckItem(
+                rule_id=c.rule_id, invoice_line_no=c.invoice_line_no, reason=c.reason
+            )
+            for c in validation_output.checks
+            if c.result == "passed"
+        ]
         cur.execute(
             """
             SELECT exception_type
@@ -221,9 +231,15 @@ def generate_proposal_from_db(
         for exc in validation_output.exceptions:
             if exc.type not in open_exception_types:
                 continue
+            source_check = checks_by_id.get(exc.rule_check_id)
             validation_exceptions.append(
                 ValidationExceptionItem(
                     type=exc.type,
+                    rule_id=exc.rule_id,
+                    reason_code=source_check.reason_code if source_check else None,
+                    invoice_line_no=source_check.invoice_line_no
+                    if source_check
+                    else None,
                     expected=str(exc.expected_amount)
                     if exc.expected_amount is not None
                     else None,
@@ -313,6 +329,7 @@ def generate_proposal_from_db(
             currency=currency or "COP",
         ),
         validation_exceptions=validation_exceptions,
+        passed_checks=passed_checks,
         risk_assessment=RiskAssessmentContextInput(
             risk_level=risk_level or "low",
             requires_human_review=requires_review,

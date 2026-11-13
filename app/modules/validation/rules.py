@@ -46,20 +46,51 @@ def money(rule, expected, actual, config, **kwargs):
     )
 
 
+def _matches_without_discount(line, config):
+    """True if quantity × unit_price equals amount within tolerance (no discount)."""
+    if None in (line.quantity, line.unit_price, line.amount):
+        return False
+    with localcontext() as ctx:
+        ctx.prec = 60
+        gross = line.quantity * line.unit_price
+    return abs(gross - line.amount) <= config.arithmetic_tolerance
+
+
 def v1(data, config):
     checks = []
     for line in data.invoice.lines:
         discount = line.discount_amount
-        if discount is None and line.line_no in data.known_no_discount_lines:
-            discount = Decimal(0)
+        inferred = False
+        if discount is None:
+            if line.line_no in data.known_no_discount_lines:
+                discount = Decimal(0)
+            elif _matches_without_discount(line, config):
+                # The document has no discount column and the amount adds up
+                # without one: the absence of a discount is evidenced by the
+                # arithmetic itself, not presumed.
+                discount = Decimal(0)
+                inferred = True
+            elif None not in (line.quantity, line.unit_price, line.amount):
+                checks.append(
+                    missing(
+                        "V1",
+                        "Descuento no declarado y el importe no cuadra sin él; "
+                        "no se puede distinguir un descuento de un error aritmético.",
+                        "UNCERTAIN_DISCOUNT",
+                        invoice_line_no=line.line_no,
+                    )
+                )
+                continue
         expected = None
         if all(v is not None for v in (line.quantity, line.unit_price, discount)):
             with localcontext() as ctx:
                 ctx.prec = 60
                 expected = line.quantity * line.unit_price - discount
-        checks.append(
-            money("V1", expected, line.amount, config, invoice_line_no=line.line_no)
-        )
+        check = money("V1", expected, line.amount, config, invoice_line_no=line.line_no)
+        if inferred:
+            check.reason += " Sin descuento declarado; el importe cuadra sin descuento."
+            check.reason_code = "NO_DISCOUNT_INFERRED"
+        checks.append(check)
     return checks or [missing("V1", "No hay líneas declaradas")]
 
 

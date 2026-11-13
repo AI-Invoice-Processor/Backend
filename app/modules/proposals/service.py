@@ -3,7 +3,11 @@
 import logging
 
 from app.modules.proposals.claude_service import ClaudeProposalExplainer
-from app.modules.proposals.template_service import generate_template_explanation
+from app.modules.proposals.template_service import (
+    generate_data_gap_explanation,
+    generate_template_explanation,
+    is_data_gap,
+)
 from app.schemas.proposals import (
     AccountingProposalData,
     ProposalMetadata,
@@ -43,6 +47,20 @@ class ProposalService:
                 output_tokens=0,
                 model="deterministic-template",
                 account_validation_status="VALIDATED",
+            )
+        elif has_exceptions and all(
+            is_data_gap(e) for e in input_data.validation_exceptions
+        ):
+            # Rule 3: Datos insuficientes no se "explican" con el LLM (evita causas inventadas)
+            generated_by = "TEMPLATE"
+            explanation = generate_data_gap_explanation(input_data)
+            status = "BLOCKED_PENDING_REVIEW"
+            metadata = ProposalMetadata(
+                latency_ms=0.5,
+                input_tokens=0,
+                output_tokens=0,
+                model="deterministic-data-gap-template",
+                account_validation_status="PENDING_VALIDATION",
             )
         else:
             # Rule 2: Utilizar Claude cuando existan excepciones o se requiera revisión
