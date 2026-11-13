@@ -7,7 +7,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 from app.api.dependencies import get_db, get_settings
-from app.api.routers import invoices, system
+from app.api.routers import invoices, system, workspace
 from app.config import Settings
 from app.modules.extraction import extract_invoice_document
 
@@ -84,6 +84,7 @@ def create_app(
     # Routers modulares
     app.include_router(system.router)
     app.include_router(invoices.router)
+    app.include_router(workspace.router)
 
     return app
 

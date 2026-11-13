@@ -27,6 +27,12 @@ def update_invoice_risk_fields(
     risk_confidence: float,
 ) -> None:
     """Update invoices table with calculated risk assessment."""
+    # The database contract supports low/medium/high. The evaluator can
+    # return the more granular critical level, which is persisted as high
+    # while its numeric score remains unchanged.
+    persisted_risk_level = (
+        "high" if risk_level.lower() == "critical" else risk_level.lower()
+    )
     cur.execute(
         """
         UPDATE invoices
@@ -37,7 +43,7 @@ def update_invoice_risk_fields(
          WHERE id = %s
         """,
         (
-            risk_level,
+            persisted_risk_level,
             Decimal(str(risk_score)),
             Decimal(str(risk_confidence)),
             invoice_id,

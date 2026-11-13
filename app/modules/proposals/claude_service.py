@@ -133,14 +133,22 @@ class ClaudeProposalExplainer:
                 f"La factura {full_inv} presenta excepción de tipo {first_exc.type} "
                 f"con una diferencia cuantificada de ${first_exc.difference or '0'} COP."
             )
+            issue_count = len(exceptions)
             details = (
-                f"Se detectaron {len(exceptions)} inconsistencia(s) técnica(s). "
-                f"Valor facturado: ${input_data.amounts.total} COP frente al valor esperado: ${first_exc.expected or 'N/A'} COP. "
-                f"Evaluación de riesgo: {input_data.risk_assessment.risk_level.upper()}."
+                f"Se {'detectó' if issue_count == 1 else 'detectaron'} {issue_count} "
+                f"{'inconsistencia técnica' if issue_count == 1 else 'inconsistencias técnicas'}. "
+                f"El total facturado es de ${input_data.amounts.total} COP. "
             )
+            expected_value = str(first_exc.expected or "").strip()
+            if expected_value and expected_value.upper() != "N/A":
+                details += f"El valor esperado registrado para la primera excepción es ${expected_value} COP. "
+            else:
+                details += "No se reportó un valor esperado para la primera excepción. "
+            details += f"El nivel de riesgo es {input_data.risk_assessment.risk_level.lower()}."
             recommendation = (
-                "Solicitar revisión documental al área solicitante o nota crédito al proveedor "
-                "antes de proceder con la causación contable."
+                "Solicitar al área solicitante los soportes necesarios para revisar las inconsistencias. "
+                "Si se confirma una diferencia en el valor cobrado, pedir al proveedor la nota crédito "
+                "correspondiente antes de continuar con la causación contable."
             )
         else:
             summary = f"La factura {full_inv} requiere revisión humana por alertas de contexto contable."
