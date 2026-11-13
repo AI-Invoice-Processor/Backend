@@ -8,6 +8,7 @@ Adheres strictly to the TypeSafe craft principles:
 - Safe fallback mechanism when Jev is unavailable.
 """
 
+import asyncio
 import json
 import logging
 import time
@@ -260,20 +261,25 @@ class ExceptionEvaluatorService:
         self.jev_adapter = jev_adapter or JevExceptionAdapter()
         self.fallback_evaluator = fallback_evaluator or RuleBasedFallbackEvaluator()
 
-    def evaluate_exceptions(
+    async def evaluate_exceptions(
         self, input_data: Stage5EvaluationInput
     ) -> Stage5EvaluationOutput:
-        """Evaluate invoice exceptions using Jev TypeSafe AI with code decision guardrails."""
+        """Evaluate invoice exceptions asynchronously using Jev TypeSafe AI with code decision guardrails."""
         # Convert findings and context into clean python dictionaries (never raw files)
         findings_payload = [e.model_dump(mode="json") for e in input_data.exceptions]
         context_payload = input_data.context.model_dump(mode="json")
 
         # Attempt evaluation with Jev TypeSafe AI
         try:
-            judgment = self.jev_adapter.evaluate_findings(
+            # If the adapter is a mock or returns a coroutine, handle both
+            res = self.jev_adapter.evaluate_findings(
                 findings=findings_payload,
                 context=context_payload,
             )
+            if asyncio.iscoroutine(res):
+                judgment = await res
+            else:
+                judgment = res
             return self._apply_decision_rules(input_data, judgment)
         except JevAdapterError as exc:
             logger.warning(
@@ -287,6 +293,24 @@ class ExceptionEvaluatorService:
                     f"Fallo de Jev ({exc.__class__.__name__}): activado fallback por reglas de seguridad"
                 )
             return fallback_result
+
+    def evaluate_exceptions_sync(
+        self, input_data: Stage5EvaluationInput
+    ) -> Stage5EvaluationOutput:
+        """Synchronous wrapper for contexts where an event loop is not running."""
+        try:
+            loop = asyncio.get_running_loop()
+        except RuntimeError:
+            loop = None
+
+        if loop and loop.is_running():
+            import concurrent.futures
+
+            with concurrent.futures.ThreadPoolExecutor(max_workers=1) as pool:
+                return pool.submit(
+                    lambda: asyncio.run(self.evaluate_exceptions(input_data))
+                ).result()
+        return asyncio.run(self.evaluate_exceptions(input_data))
 
     def _apply_decision_rules(
         self,

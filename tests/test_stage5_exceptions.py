@@ -1,7 +1,7 @@
 """Unit and integration tests for Stage 5: Intelligent exception evaluation with Jev."""
 
 from decimal import Decimal
-from unittest.mock import MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 from uuid import uuid4
 
 import pytest
@@ -54,28 +54,31 @@ def sample_po_exception_input() -> Stage5EvaluationInput:
 @pytest.fixture
 def mock_jev_adapter():
     adapter = MagicMock(spec=JevExceptionAdapter)
-    adapter.evaluate_findings.return_value = JevJudgmentResult(
-        category="amount_mismatch",
-        category_confidence=0.96,
-        category_probabilities={"amount_mismatch": 0.96, "other": 0.04},
-        risk_level="high",
-        risk_confidence=0.94,
-        risk_probabilities={"high": 0.85, "medium": 0.10, "critical": 0.05, "low": 0.0},
-        information_sufficiency=0.95,
-        ambiguity_detected=0.08,
-        input_tokens=180,
-        output_tokens=4,
-        latency_ms=120.5,
-        model_version="jev-1.14.0",
-        raw_state={},
+    adapter.evaluate_findings = AsyncMock(
+        return_value=JevJudgmentResult(
+            category="amount_mismatch",
+            category_confidence=0.96,
+            category_probabilities={"amount_mismatch": 0.96, "other": 0.04},
+            risk_level="high",
+            risk_confidence=0.94,
+            risk_probabilities={"high": 0.85, "medium": 0.10, "critical": 0.05, "low": 0.0},
+            information_sufficiency=0.95,
+            ambiguity_detected=0.08,
+            input_tokens=180,
+            output_tokens=4,
+            latency_ms=120.5,
+            model_version="jev-1.14.0",
+            raw_state={},
+        )
     )
     return adapter
 
 
 # 1. Test schema normalization and contracts
-def test_stage5_schema_contract_matching(sample_po_exception_input, mock_jev_adapter):
+@pytest.mark.anyio
+async def test_stage5_schema_contract_matching(sample_po_exception_input, mock_jev_adapter):
     service = ExceptionEvaluatorService(jev_adapter=mock_jev_adapter)
-    output = service.evaluate_exceptions(sample_po_exception_input)
+    output = await service.evaluate_exceptions(sample_po_exception_input)
 
     assert isinstance(output, Stage5EvaluationOutput)
     assert output.schema_version == "0.2.0"
@@ -89,28 +92,31 @@ def test_stage5_schema_contract_matching(sample_po_exception_input, mock_jev_ada
 
 
 # 2. Test guardrail: Never allow Jev to override mandatory failed validations
-def test_guardrail_mandatory_exceptions_cannot_be_overridden_by_jev(
+@pytest.mark.anyio
+async def test_guardrail_mandatory_exceptions_cannot_be_overridden_by_jev(
     sample_po_exception_input,
 ):
     # Even if Jev erroneously reports "low" risk with 1.0 confidence:
     lenient_adapter = MagicMock(spec=JevExceptionAdapter)
-    lenient_adapter.evaluate_findings.return_value = JevJudgmentResult(
-        category="amount_mismatch",
-        category_confidence=0.99,
-        category_probabilities={"amount_mismatch": 1.0},
-        risk_level="low",  # Jev says low
-        risk_confidence=0.99,
-        risk_probabilities={"low": 1.0},
-        information_sufficiency=0.99,
-        ambiguity_detected=0.01,
-        input_tokens=100,
-        output_tokens=4,
-        latency_ms=50.0,
-        model_version="jev-1.14.0",
-        raw_state={},
+    lenient_adapter.evaluate_findings = AsyncMock(
+        return_value=JevJudgmentResult(
+            category="amount_mismatch",
+            category_confidence=0.99,
+            category_probabilities={"amount_mismatch": 1.0},
+            risk_level="low",  # Jev says low
+            risk_confidence=0.99,
+            risk_probabilities={"low": 1.0},
+            information_sufficiency=0.99,
+            ambiguity_detected=0.01,
+            input_tokens=100,
+            output_tokens=4,
+            latency_ms=50.0,
+            model_version="jev-1.14.0",
+            raw_state={},
+        )
     )
     service = ExceptionEvaluatorService(jev_adapter=lenient_adapter)
-    output = service.evaluate_exceptions(sample_po_exception_input)
+    output = await service.evaluate_exceptions(sample_po_exception_input)
 
     # Business rule in code ensures requires_human_review stays True!
     assert output.risk_assessment.requires_human_review is True
@@ -122,6 +128,7 @@ def test_guardrail_mandatory_exceptions_cannot_be_overridden_by_jev(
 
 
 # 3. Test uncertainty: low confidence, high ambiguity, or insufficient info triggers human review
+@pytest.mark.anyio
 @pytest.mark.parametrize(
     "ambiguity, sufficiency, confidence, expected_reason_keyword",
     [
@@ -130,7 +137,7 @@ def test_guardrail_mandatory_exceptions_cannot_be_overridden_by_jev(
         (0.10, 0.90, 0.55, "Confianza"),
     ],
 )
-def test_uncertainty_handling_triggers_human_review(
+async def test_uncertainty_handling_triggers_human_review(
     ambiguity, sufficiency, confidence, expected_reason_keyword
 ):
     inp = Stage5EvaluationInput(
@@ -139,23 +146,25 @@ def test_uncertainty_handling_triggers_human_review(
         context=EvaluationContextInput(),
     )
     adapter = MagicMock(spec=JevExceptionAdapter)
-    adapter.evaluate_findings.return_value = JevJudgmentResult(
-        category="other",
-        category_confidence=confidence,
-        category_probabilities={"other": confidence},
-        risk_level="low",
-        risk_confidence=confidence,
-        risk_probabilities={"low": confidence},
-        information_sufficiency=sufficiency,
-        ambiguity_detected=ambiguity,
-        input_tokens=100,
-        output_tokens=4,
-        latency_ms=50.0,
-        model_version="jev-1.14.0",
-        raw_state={},
+    adapter.evaluate_findings = AsyncMock(
+        return_value=JevJudgmentResult(
+            category="other",
+            category_confidence=confidence,
+            category_probabilities={"other": confidence},
+            risk_level="low",
+            risk_confidence=confidence,
+            risk_probabilities={"low": confidence},
+            information_sufficiency=sufficiency,
+            ambiguity_detected=ambiguity,
+            input_tokens=100,
+            output_tokens=4,
+            latency_ms=50.0,
+            model_version="jev-1.14.0",
+            raw_state={},
+        )
     )
     service = ExceptionEvaluatorService(jev_adapter=adapter)
-    output = service.evaluate_exceptions(inp)
+    output = await service.evaluate_exceptions(inp)
 
     assert output.risk_assessment.requires_human_review is True
     assert output.decision == "REQUIERE_REVISION"
@@ -167,14 +176,15 @@ def test_uncertainty_handling_triggers_human_review(
 
 
 # 4. Test fallback mechanism when Jev is unavailable (network, timeout, API down)
-def test_fallback_when_jev_is_unavailable(sample_po_exception_input):
+@pytest.mark.anyio
+async def test_fallback_when_jev_is_unavailable(sample_po_exception_input):
     failing_adapter = MagicMock(spec=JevExceptionAdapter)
-    failing_adapter.evaluate_findings.side_effect = JevConnectionError(
-        "Connection timeout to api.typesafe.ai"
+    failing_adapter.evaluate_findings = AsyncMock(
+        side_effect=JevConnectionError("Connection timeout to api.typesafe.ai")
     )
 
     service = ExceptionEvaluatorService(jev_adapter=failing_adapter)
-    output = service.evaluate_exceptions(sample_po_exception_input)
+    output = await service.evaluate_exceptions(sample_po_exception_input)
 
     assert output.schema_version == "0.2.0"
     assert output.risk_assessment.requires_human_review is True
@@ -257,7 +267,8 @@ def test_repository_db_operations():
 
 
 # 7. Test DB adapter flow evaluate_invoice_from_db
-def test_evaluate_invoice_from_db_mocked(mock_jev_adapter):
+@pytest.mark.anyio
+async def test_evaluate_invoice_from_db_mocked(mock_jev_adapter):
     cur = MagicMock()
     inv_id = uuid4()
     doc_id = uuid4()
@@ -289,7 +300,7 @@ def test_evaluate_invoice_from_db_mocked(mock_jev_adapter):
     ]
 
     service = ExceptionEvaluatorService(jev_adapter=mock_jev_adapter)
-    out = evaluate_invoice_from_db(cur, inv_id, service)
+    out = await evaluate_invoice_from_db(cur, inv_id, service)
 
     assert out.invoice_id == inv_id
     assert out.risk_assessment.risk_level == "high"

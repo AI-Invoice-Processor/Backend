@@ -1,5 +1,6 @@
 """Database persistence and integration for Stage 5 exception evaluation."""
 
+import asyncio
 import json
 from decimal import Decimal
 from uuid import UUID
@@ -97,7 +98,7 @@ def record_exception_evaluation_event(
     )
 
 
-def evaluate_invoice_from_db(
+async def evaluate_invoice_from_db(
     cur,
     invoice_id: UUID,
     service: ExceptionEvaluatorService,
@@ -219,8 +220,9 @@ def evaluate_invoice_from_db(
         context=context,
     )
 
-    # 5. Execute Stage 5 Evaluation
-    output = service.evaluate_exceptions(input_data)
+    # 5. Execute Stage 5 Evaluation asynchronously
+    res = service.evaluate_exceptions(input_data)
+    output = await res if asyncio.iscoroutine(res) else res
 
     # 6. Update invoices table
     update_invoice_risk_fields(

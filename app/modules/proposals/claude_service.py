@@ -1,5 +1,6 @@
-"""Claude API service for generating structured exception explanations."""
+"""Claude API service for generating structured exception explanations asynchronously."""
 
+import asyncio
 import logging
 import time
 from typing import Any
@@ -21,23 +22,25 @@ class ClaudeServiceError(Exception):
 
 
 class ClaudeProposalExplainer:
-    """Invokes Anthropic Claude API using Structured Tool Outputs to explain accounting exceptions."""
+    """Invokes Anthropic Claude API using Structured Tool Outputs asynchronously.
+
+    Ensures non-blocking I/O so the FastAPI event loop can serve other concurrent
+    requests while awaiting Claude's response.
+    """
 
     def __init__(self, api_key: str | None = None, model: str = "claude-sonnet-4-6"):
         self.api_key = api_key
         self.model = model
 
-    def explain_exceptions(
+    async def explain_exceptions(
         self, input_data: Stage6ProposalInput
     ) -> tuple[Explanation, ProposalMetadata]:
-        """Generate structured explanation using Claude API or graceful fallback if unreachable."""
+        """Generate structured explanation asynchronously using Claude API without blocking the thread."""
         if not self.api_key:
             logger.warning(
                 "ANTHROPIC_API_KEY no configurada. Usando generador contextual determinista de contingencia."
             )
-            return self._fallback_explanation(
-                input_data, reason="Sin API Key configurada"
-            )
+            return self._fallback_explanation(input_data, reason="Sin API Key configurada")
 
         doc_refs = input_data.document_references
         inv_num = doc_refs.get("number") or str(input_data.invoice_id)[:8]
@@ -48,9 +51,7 @@ class ClaudeProposalExplainer:
             invoice_ref=full_invoice_num,
             supplier_name=input_data.supplier.name,
             amounts=input_data.amounts.model_dump(),
-            validation_exceptions=[
-                e.model_dump() for e in input_data.validation_exceptions
-            ],
+            validation_exceptions=[e.model_dump() for e in input_data.validation_exceptions],
             passed_checks=[c.model_dump() for c in input_data.passed_checks],
             risk_assessment=input_data.risk_assessment.model_dump(),
             document_references=doc_refs,
@@ -58,53 +59,37 @@ class ClaudeProposalExplainer:
 
         start_time = time.perf_counter()
         try:
-            client = anthropic.Anthropic(api_key=self.api_key)
-            message = client.messages.create(
-                model=self.model,
-                max_tokens=2048,
-                system=EXPLANATION_SYSTEM_PROMPT,
-                tools=[EXPLANATION_TOOL_SCHEMA],
-                tool_choice={"type": "tool", "name": "generate_accounting_explanation"},
-                messages=[{"role": "user", "content": user_prompt}],
-            )
-        except anthropic.AnthropicError as exc:
-            logger.warning(
-                "Error invocando Claude API para explicación contable: %s", exc
-            )
-            return self._fallback_explanation(
-                input_data, reason=f"Fallo en Claude API: {exc}"
-            )
+            # Fully non-blocking async HTTP request via AsyncAnthropic
+            async with anthropic.AsyncAnthropic(api_key=self.api_key) as client:
+                message = await client.messages.create(
+                    model=self.model,
+                    max_tokens=2048,
+                    system=EXPLANATION_SYSTEM_PROMPT,
+                    tools=[EXPLANATION_TOOL_SCHEMA],
+                    tool_choice={"type": "tool", "name": "generate_accounting_explanation"},
+                    messages=[{"role": "user", "content": user_prompt}],
+                )
+        except Exception as exc:
+            logger.warning("Error invocando Claude API de forma asíncrona: %s", exc)
+            return self._fallback_explanation(input_data, reason=f"Fallo en Claude API: {exc}")
 
         elapsed_ms = (time.perf_counter() - start_time) * 1000.0
 
         # Extract structured tool output
         explanation_data: dict[str, Any] | None = None
         for block in message.content:
-            if (
-                block.type == "tool_use"
-                and block.name == "generate_accounting_explanation"
-            ):
+            if block.type == "tool_use" and block.name == "generate_accounting_explanation":
                 explanation_data = block.input
                 break
 
         if not explanation_data:
-            logger.warning(
-                "Claude no devolvió bloque tool_use esperado. Activando fallback."
-            )
-            return self._fallback_explanation(
-                input_data, reason="Claude response missing tool_use block"
-            )
+            logger.warning("Claude no devolvió bloque tool_use esperado. Activando fallback.")
+            return self._fallback_explanation(input_data, reason="Claude response missing tool_use block")
 
         explanation = Explanation(
-            summary=explanation_data.get(
-                "summary", "Excepción detectada en validación financiera."
-            ),
-            details=explanation_data.get(
-                "details", "Discrepancia entre documentos de respaldo."
-            ),
-            recommendation=explanation_data.get(
-                "recommendation", "Revisar soporte antes de causar."
-            ),
+            summary=explanation_data.get("summary", "Excepción detectada en validación financiera."),
+            details=explanation_data.get("details", "Discrepancia entre documentos de respaldo."),
+            recommendation=explanation_data.get("recommendation", "Revisar soporte antes de causar."),
         )
 
         metadata = ProposalMetadata(
@@ -116,6 +101,22 @@ class ClaudeProposalExplainer:
         )
 
         return explanation, metadata
+
+    def explain_exceptions_sync(
+        self, input_data: Stage6ProposalInput
+    ) -> tuple[Explanation, ProposalMetadata]:
+        """Synchronous wrapper for contexts where an event loop is not running."""
+        try:
+            loop = asyncio.get_running_loop()
+        except RuntimeError:
+            loop = None
+
+        if loop and loop.is_running():
+            import concurrent.futures
+
+            with concurrent.futures.ThreadPoolExecutor(max_workers=1) as pool:
+                return pool.submit(lambda: asyncio.run(self.explain_exceptions(input_data))).result()
+        return asyncio.run(self.explain_exceptions(input_data))
 
     def _fallback_explanation(
         self, input_data: Stage6ProposalInput, reason: str
@@ -158,9 +159,7 @@ class ClaudeProposalExplainer:
 
         elapsed_ms = (time.perf_counter() - start_time) * 1000.0
 
-        explanation = Explanation(
-            summary=summary, details=details, recommendation=recommendation
-        )
+        explanation = Explanation(summary=summary, details=details, recommendation=recommendation)
         metadata = ProposalMetadata(
             latency_ms=round(elapsed_ms, 2),
             input_tokens=0,

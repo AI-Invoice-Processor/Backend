@@ -71,7 +71,7 @@ EXTENSION_BY_CONTENT_TYPE = {
     response_description="Lista de facturas recibidas y procesadas.",
     response_model=list[InvoiceListItem],
 )
-def list_invoices(
+async def list_invoices(
     conn: Annotated[psycopg.Connection, Depends(get_db)],
 ) -> list[InvoiceListItem]:
     with conn.cursor() as cur:
@@ -92,7 +92,7 @@ def list_invoices(
     responses={404: {"description": "Factura no encontrada."}},
     response_model=InvoiceMatchingResponse,
 )
-def match_invoice(
+async def match_invoice(
     invoice_id: UUID,
     conn: Annotated[psycopg.Connection, Depends(get_db)],
 ) -> InvoiceMatchingResponse:
@@ -112,7 +112,7 @@ def match_invoice(
     responses={404: {"description": "Factura no encontrada."}},
     response_model=InvoiceDetail,
 )
-def get_invoice_detail(
+async def get_invoice_detail(
     invoice_id: UUID,
     conn: Annotated[psycopg.Connection, Depends(get_db)],
 ) -> InvoiceDetail:
@@ -137,7 +137,7 @@ def get_invoice_detail(
     },
     response_model=UploadInvoiceResponse,
 )
-def upload_invoice(
+async def upload_invoice(
     file: Annotated[UploadFile, File(...)],
     conn: Annotated[psycopg.Connection, Depends(get_db)],
     settings: Annotated[Settings, Depends(get_settings)],
@@ -149,7 +149,7 @@ def upload_invoice(
             detail="El archivo debe ser PDF, PNG o JPG.",
         )
 
-    content = file.file.read(settings.max_upload_size + 1)
+    content = await file.read(settings.max_upload_size + 1)
     if len(content) > settings.max_upload_size:
         raise HTTPException(
             status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
@@ -222,7 +222,7 @@ def upload_invoice(
     response_model=ValidationOutput,
     summary="Ejecutar validación financiera determinista (Etapa 4)",
 )
-def validate_invoice(
+async def validate_invoice(
     invoice_id: UUID,
     conn: Annotated[psycopg.Connection, Depends(get_db)],
     settings: Annotated[Settings, Depends(get_settings)],
@@ -266,10 +266,10 @@ def validate_invoice(
     summary="Evaluación inteligente de excepciones con Jev TypeSafe AI (Etapa 5)",
     description=(
         "Clasifica las excepciones detectadas por la validación financiera y evalúa el riesgo "
-        "usando Jev TypeSafe AI. Actualiza risk_level, risk_score y risk_confidence en la factura."
+        "usando Jev TypeSafe AI de forma asíncrona. Actualiza risk_level, risk_score y risk_confidence."
     ),
 )
-def evaluate_invoice_exceptions(
+async def evaluate_invoice_exceptions(
     invoice_id: UUID,
     conn: Annotated[psycopg.Connection, Depends(get_db)],
     settings: Annotated[Settings, Depends(get_settings)],
@@ -281,7 +281,7 @@ def evaluate_invoice_exceptions(
     service = ExceptionEvaluatorService(jev_adapter=jev_adapter)
     try:
         with conn.transaction(), conn.cursor() as cur:
-            return evaluate_invoice_from_db(cur, invoice_id, service)
+            return await evaluate_invoice_from_db(cur, invoice_id, service)
     except ExceptionInvoiceNotFoundError as exc:
         raise HTTPException(status_code=404, detail="Factura no encontrada") from exc
     except psycopg.Error as exc:
@@ -296,11 +296,11 @@ def evaluate_invoice_exceptions(
     response_model=Stage5EvaluationOutput,
     summary="Evaluación directa de excepciones con Jev (Etapa 5 sin DB)",
     description=(
-        "Evalúa directamente un payload de hallazgos calculados y contexto sin requerir "
-        "persistencia previa. Útil para microservicios, pipelines de prueba y auditorías."
+        "Evalúa directamente un payload de hallazgos calculados y contexto sin bloquear "
+        "el event loop de FastAPI durante la llamada a Jev."
     ),
 )
-def evaluate_exceptions_direct(
+async def evaluate_exceptions_direct(
     payload: Stage5EvaluationInput,
     settings: Annotated[Settings, Depends(get_settings)],
 ) -> Stage5EvaluationOutput:
@@ -309,7 +309,7 @@ def evaluate_exceptions_direct(
         model=settings.typesafe_model,
     )
     service = ExceptionEvaluatorService(jev_adapter=jev_adapter)
-    return service.evaluate_exceptions(payload)
+    return await service.evaluate_exceptions(payload)
 
 
 @router.post(
@@ -317,12 +317,12 @@ def evaluate_exceptions_direct(
     response_model=Stage6ProposalOutput,
     summary="Generar propuesta contable y explicación de excepciones (Etapa 6)",
     description=(
-        "Genera la propuesta de causación en accounting_proposals. "
+        "Genera la propuesta de causación en accounting_proposals de forma asíncrona. "
         "Si no hay excepciones, genera la explicación con plantilla (TEMPLATE); "
-        "si hay excepciones o revisión requerida, usa Claude (CLAUDE)."
+        "si hay excepciones o revisión requerida, usa Claude asíncronamente (CLAUDE)."
     ),
 )
-def create_invoice_proposal(
+async def create_invoice_proposal(
     invoice_id: UUID,
     conn: Annotated[psycopg.Connection, Depends(get_db)],
     settings: Annotated[Settings, Depends(get_settings)],
@@ -334,7 +334,7 @@ def create_invoice_proposal(
     service = ProposalService(claude_explainer=claude_explainer)
     try:
         with conn.transaction(), conn.cursor() as cur:
-            return generate_proposal_from_db(cur, invoice_id, service)
+            return await generate_proposal_from_db(cur, invoice_id, service)
     except ProposalInvoiceNotFoundError as exc:
         raise HTTPException(status_code=404, detail="Factura no encontrada") from exc
     except psycopg.Error as exc:
@@ -349,7 +349,7 @@ def create_invoice_proposal(
     response_model=Stage6ProposalOutput,
     summary="Consultar propuesta contable vigente de una factura (Etapa 6)",
 )
-def get_invoice_proposal(
+async def get_invoice_proposal(
     invoice_id: UUID,
     conn: Annotated[psycopg.Connection, Depends(get_db)],
 ) -> Stage6ProposalOutput:
@@ -369,10 +369,10 @@ def get_invoice_proposal(
     summary="Generar propuesta contable directa (Etapa 6 sin DB)",
     description=(
         "Genera directamente la propuesta y explicación para un payload estructurado sin "
-        "consultar la base de datos. Útil para microservicios y auditorías externas."
+        "bloquear el hilo ni el event loop mientras espera la respuesta de Claude."
     ),
 )
-def create_proposal_direct(
+async def create_proposal_direct(
     payload: Stage6ProposalInput,
     settings: Annotated[Settings, Depends(get_settings)],
 ) -> Stage6ProposalOutput:
@@ -381,4 +381,4 @@ def create_proposal_direct(
         model=settings.anthropic_model,
     )
     service = ProposalService(claude_explainer=claude_explainer)
-    return service.generate_proposal(payload)
+    return await service.generate_proposal(payload)
