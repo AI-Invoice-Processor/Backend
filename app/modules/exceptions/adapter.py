@@ -18,7 +18,6 @@ from typesafe_sdk import (
     TypeSafeAPIError,
     TypeSafeAPITimeoutError,
     TypeSafeAuthenticationError,
-    TypeSafeClient,
     TypeSafeError,
     TypeSafeRateLimitError,
 )
@@ -105,7 +104,9 @@ class JevExceptionAdapter:
 
         start_time = time.perf_counter()
         try:
-            async with AsyncTypeSafeClient(api_key=self.api_key, model=self.model) as client:
+            async with AsyncTypeSafeClient(
+                api_key=self.api_key, model=self.model
+            ) as client:
                 response = await client.system_one(
                     state=state,
                     questions=questions,
@@ -198,6 +199,4 @@ class JevExceptionAdapter:
                         self.evaluate_findings(findings=findings, context=context)
                     )
                 ).result()
-        return asyncio.run(
-            self.evaluate_findings(findings=findings, context=context)
-        )
+        return asyncio.run(self.evaluate_findings(findings=findings, context=context))

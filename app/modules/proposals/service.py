@@ -2,7 +2,6 @@
 
 import asyncio
 import logging
-from uuid import UUID
 
 from app.modules.proposals.claude_service import ClaudeProposalExplainer
 from app.modules.proposals.template_service import (
@@ -12,7 +11,6 @@ from app.modules.proposals.template_service import (
 )
 from app.schemas.proposals import (
     AccountingProposalData,
-    Explanation,
     ProposalMetadata,
     ProposalStatus,
     Stage6ProposalInput,
@@ -33,7 +31,9 @@ class ProposalService:
     def __init__(self, claude_explainer: ClaudeProposalExplainer | None = None):
         self.claude_explainer = claude_explainer or ClaudeProposalExplainer()
 
-    async def generate_proposal(self, input_data: Stage6ProposalInput) -> Stage6ProposalOutput:
+    async def generate_proposal(
+        self, input_data: Stage6ProposalInput
+    ) -> Stage6ProposalOutput:
         """Generate structured accounting proposal and explanation asynchronously."""
         has_exceptions = bool(input_data.validation_exceptions)
         requires_review = input_data.risk_assessment.requires_human_review
@@ -69,7 +69,9 @@ class ProposalService:
             # Non-blocking async I/O awaiting Claude API
             generated_by = "CLAUDE"
             status: ProposalStatus = "BLOCKED_PENDING_REVIEW"
-            explanation, metadata = await self.claude_explainer.explain_exceptions(input_data)
+            explanation, metadata = await self.claude_explainer.explain_exceptions(
+                input_data
+            )
 
         # Rule 4 & 5: Validar cuentas contables y centros de costo autorizados (sin inventar códigos)
         account_code, cost_center_code, val_status = self._validate_accounting_codes(
@@ -96,7 +98,9 @@ class ProposalService:
             metadata=metadata,
         )
 
-    def generate_proposal_sync(self, input_data: Stage6ProposalInput) -> Stage6ProposalOutput:
+    def generate_proposal_sync(
+        self, input_data: Stage6ProposalInput
+    ) -> Stage6ProposalOutput:
         """Synchronous wrapper for contexts where an event loop is not already running."""
         try:
             loop = asyncio.get_running_loop()
@@ -107,10 +111,14 @@ class ProposalService:
             import concurrent.futures
 
             with concurrent.futures.ThreadPoolExecutor(max_workers=1) as pool:
-                return pool.submit(lambda: asyncio.run(self.generate_proposal(input_data))).result()
+                return pool.submit(
+                    lambda: asyncio.run(self.generate_proposal(input_data))
+                ).result()
         return asyncio.run(self.generate_proposal(input_data))
 
-    def _validate_accounting_codes(self, acct_ctx) -> tuple[str | None, str | None, str]:
+    def _validate_accounting_codes(
+        self, acct_ctx
+    ) -> tuple[str | None, str | None, str]:
         """Validate suggested account and cost center against authorized master lists."""
         suggested_account = acct_ctx.suggested_account
         suggested_cc = acct_ctx.cost_center
@@ -130,7 +138,9 @@ class ProposalService:
         if not suggested_account or not suggested_cc or not acct_valid or not cc_valid:
             status = "PENDING_VALIDATION"
 
-        final_acct = suggested_account if (acct_valid or not authorized_accounts) else None
+        final_acct = (
+            suggested_account if (acct_valid or not authorized_accounts) else None
+        )
         final_cc = suggested_cc if (cc_valid or not authorized_ccs) else None
 
         return final_acct, final_cc, status

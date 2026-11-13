@@ -386,7 +386,9 @@ async def test_data_gap_exceptions_use_template_without_calling_claude(
 
 
 @pytest.mark.anyio
-async def test_value_mismatch_still_goes_to_claude_with_rule_context(clean_invoice_input):
+async def test_value_mismatch_still_goes_to_claude_with_rule_context(
+    clean_invoice_input,
+):
     explainer = MagicMock(spec=ClaudeProposalExplainer)
     explainer.explain_exceptions = AsyncMock(
         return_value=(
@@ -429,6 +431,7 @@ async def test_concurrency_non_blocking_claude_io(
     clean_invoice_input, exception_invoice_input
 ):
     """Verify that a slow Claude I/O call does not block other requests in the event loop."""
+
     async def delayed_explain(*args, **kwargs):
         await asyncio.sleep(0.3)
         return (

@@ -61,7 +61,12 @@ def mock_jev_adapter():
             category_probabilities={"amount_mismatch": 0.96, "other": 0.04},
             risk_level="high",
             risk_confidence=0.94,
-            risk_probabilities={"high": 0.85, "medium": 0.10, "critical": 0.05, "low": 0.0},
+            risk_probabilities={
+                "high": 0.85,
+                "medium": 0.10,
+                "critical": 0.05,
+                "low": 0.0,
+            },
             information_sufficiency=0.95,
             ambiguity_detected=0.08,
             input_tokens=180,
@@ -76,7 +81,9 @@ def mock_jev_adapter():
 
 # 1. Test schema normalization and contracts
 @pytest.mark.anyio
-async def test_stage5_schema_contract_matching(sample_po_exception_input, mock_jev_adapter):
+async def test_stage5_schema_contract_matching(
+    sample_po_exception_input, mock_jev_adapter
+):
     service = ExceptionEvaluatorService(jev_adapter=mock_jev_adapter)
     output = await service.evaluate_exceptions(sample_po_exception_input)
 
