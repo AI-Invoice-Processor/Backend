@@ -1,4 +1,4 @@
-fastapi==0.162.4
+fastapi==0.163.1
 psycopg[binary]==3.3.8
 pydantic-settings==2.9.1
 python-multipart==0.0.33
